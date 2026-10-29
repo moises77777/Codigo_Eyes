@@ -16,9 +16,18 @@ void main() {
       expect(Traducciones.traducir('PERSON'), 'persona');
     });
 
-    test('devuelve la etiqueta original si no existe', () {
+    test('devuelve objeto si la etiqueta no existe', () {
       expect(Traducciones.traducir('car'), 'auto');
-      expect(Traducciones.traducir('unknown thing'), 'Unknown thing');
+      expect(Traducciones.traducir('unknown thing'), 'objeto');
+    });
+
+    test('traduce las etiquetas gruesas del ObjectDetector', () {
+      expect(Traducciones.traducir('Home good'), 'artículo del hogar');
+      expect(Traducciones.traducir('Fashion good'), 'prenda o accesorio');
+      expect(Traducciones.traducir('Food'), 'comida');
+      expect(Traducciones.traducir('Place'), 'lugar');
+      expect(Traducciones.traducir('Plant'), 'planta');
+      expect(Traducciones.traducir('Good'), 'objeto');
     });
 
     test('contiene revisa el diccionario', () {

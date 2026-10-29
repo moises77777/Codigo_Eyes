@@ -3,10 +3,9 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../controllers/eyes_controller.dart';
 import '../services/permission_service.dart';
-import '../services/voice_input_service.dart';
 
 /// Bienvenida 100 % por voz: pide el nombre, los permisos y el
-/// consentimiento de Gemini sin necesidad de ver la pantalla.
+/// consentimiento de la IA en la nube sin necesidad de ver la pantalla.
 /// El campo de texto solo queda como respaldo por si el micrófono falla.
 class BienvenidaScreen extends StatefulWidget {
   final EyesController controller;
@@ -22,15 +21,20 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
   int _paso = 0;
   bool _escuchando = false;
   String _nombreVoz = '';
-  int _intentosNombre = 0;
-  int _intentosGemini = 0;
-
-  static const _maxIntentos = 3;
 
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_syncEscuchando);
     WidgetsBinding.instance.addPostFrameCallback((_) => _iniciar());
+  }
+
+  /// El ícono del micrófono refleja el estado real del controlador.
+  void _syncEscuchando() {
+    final esc = widget.controller.estado == EstadoEyes.escuchando;
+    if (esc != _escuchando && mounted) {
+      setState(() => _escuchando = esc);
+    }
   }
 
   // ---------- Flujo por voz ----------
@@ -54,40 +58,32 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
   }
 
   Future<void> _pedirNombre() async {
-    await widget.controller.hablar('¿Cómo te llamas?', guardarRespuesta: false);
-    final texto = await _escuchar();
+    final texto = await widget.controller.pedirRespuesta(
+      '¿Cómo te llamas?',
+      mensajeReintento: 'No escuché tu nombre. Dímelo otra vez.',
+    );
     if (!mounted) return;
 
     final nombre = _limpiarNombre(texto ?? '');
     if (nombre.isEmpty) {
-      _intentosNombre++;
-      if (_intentosNombre >= _maxIntentos) {
-        await widget.controller.hablar(
-          'No te escuché bien. Escribe tu nombre en el campo de texto y toca continuar.',
-          guardarRespuesta: false,
-        );
-        return;
-      }
       await widget.controller.hablar(
-        'No escuché tu nombre. Intentemos de nuevo.',
+        'No te escuché bien. Escribe tu nombre en el campo de texto y toca continuar.',
         guardarRespuesta: false,
       );
-      return _pedirNombre();
+      return;
     }
 
     _nombreVoz = nombre;
     _nombreController.text = nombre;
-    await widget.controller.hablar(
-      'Te llamaré $nombre. ¿Es correcto? Di sí o no.',
-      guardarRespuesta: false,
-    );
 
-    final confirmacion = await _escuchar();
+    final confirmacion = await widget.controller.pedirConfirmacion(
+      'Te llamaré $nombre. ¿Es correcto? Di sí o no.',
+    );
     if (!mounted) return;
 
-    if (_esAfirmativo(confirmacion ?? '')) {
+    if (confirmacion == true) {
       _pasoPermisos();
-    } else {
+    } else if (confirmacion == false) {
       _nombreVoz = '';
       _nombreController.clear();
       await widget.controller.hablar(
@@ -95,6 +91,11 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
         guardarRespuesta: false,
       );
       _pedirNombre();
+    } else {
+      await widget.controller.hablar(
+        'No te escuché bien. Escribe tu nombre en el campo de texto y toca continuar.',
+        guardarRespuesta: false,
+      );
     }
   }
 
@@ -116,42 +117,30 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
         guardarRespuesta: false,
       );
     }
-    await _pasoGemini();
+    await _pasoIaNube();
   }
 
-  Future<void> _pasoGemini() async {
+  Future<void> _pasoIaNube() async {
     setState(() => _paso = 2);
-    await widget.controller.hablar(
-      'Para descripciones más completas puedo enviar fotos a Google Gemini. '
+    final acepta = await widget.controller.pedirConfirmacion(
+      'Para descripciones más completas puedo enviar fotos a una inteligencia artificial en la nube. '
       'Las imágenes no se guardan en ningún lado. ¿Lo permites? Di sí o no.',
-      guardarRespuesta: false,
     );
-
-    final respuesta = await _escuchar();
     if (!mounted) return;
 
-    final acepta = _esAfirmativo(respuesta ?? '');
-    if ((respuesta ?? '').isEmpty) {
-      _intentosGemini++;
-      if (_intentosGemini >= _maxIntentos) {
-        await widget.controller.hablar(
-          'No te escuché. Uso los botones de la pantalla. '
-          'Toca sí para permitir o no para rechazar.',
-          guardarRespuesta: false,
-        );
-        return;
-      }
+    if (acepta == null) {
       await widget.controller.hablar(
-        'No escuché tu respuesta. Di sí o no.',
+        'No te escuché. Uso los botones de la pantalla. '
+        'Toca sí para permitir o no para rechazar.',
         guardarRespuesta: false,
       );
-      return _pasoGemini();
+      return;
     }
 
     await _finalizar(acepta);
   }
 
-  Future<void> _finalizar(bool aceptaGemini) async {
+  Future<void> _finalizar(bool aceptaIaNube) async {
     final nombre = _nombreVoz.isNotEmpty
         ? _nombreVoz
         : _nombreController.text.trim();
@@ -162,7 +151,7 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
       );
       return;
     }
-    await widget.controller.finalizarBienvenida(nombre, aceptaGemini);
+    await widget.controller.finalizarBienvenida(nombre, aceptaIaNube);
     await widget.controller.hablar(
       'Perfecto, $nombre. EYES está listo. Te espero en la pantalla principal.',
       guardarRespuesta: false,
@@ -172,39 +161,7 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
     }
   }
 
-  // ---------- Utilidades de voz ----------
-
-  /// Escucha una respuesta corta del usuario. Devuelve null si no se escuchó nada.
-  Future<String?> _escuchar() async {
-    if (_escuchando) return null;
-    setState(() => _escuchando = true);
-
-    String? resultado;
-    var termino = false;
-    await VoiceInputService.listen(
-      onResult: (texto) {
-        resultado = texto;
-        termino = true;
-      },
-      onError: (_) {
-        resultado = null;
-        termino = true;
-      },
-    );
-
-    // Esperar a que el usuario termine de hablar (máx. 12 s).
-    for (var i = 0; i < 120 && !termino; i++) {
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-    if (mounted) setState(() => _escuchando = false);
-    return resultado;
-  }
-
-  bool _esAfirmativo(String texto) {
-    final t = texto.toLowerCase().trim();
-    const positivos = ['si', 'sí', 'correcto', 'claro', 'dale', 'ok', 'esta bien', 'adelante'];
-    return positivos.any((p) => t.startsWith(p));
-  }
+  // ---------- Utilidades ----------
 
   String _limpiarNombre(String texto) {
     final prefijos = [
@@ -281,7 +238,7 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
                   child: const Text('Continuar'),
                 ),
               ],
-              // Respaldo visual: botones para el consentimiento de Gemini.
+              // Respaldo visual: botones para el consentimiento de la IA.
               if (_paso == 2) ...[
                 ElevatedButton(
                   onPressed: () => _finalizar(true),
@@ -315,6 +272,7 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_syncEscuchando);
     _nombreController.dispose();
     super.dispose();
   }

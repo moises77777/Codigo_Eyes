@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
+import '../models/contacto_apoyo.dart';
 import '../models/resultado.dart';
 
 /// Abstracción sobre SharedPreferences para guardar toda la configuración
@@ -24,10 +25,45 @@ class StorageService {
   static const _kPitch = 'eyes_pitch';
   static const _kEscuchaContinua = 'eyes_escucha_continua';
   static const _kUsarIaNube = 'eyes_usar_ia_nube';
-  static const _kAceptoGemini = 'eyes_acepto_gemini';
+  static const _kAceptoIaNube = 'eyes_acepto_ia_nube';
   static const _kPrimerUso = 'eyes_primer_uso_completado';
-  static const _kGeminiApiKey = 'eyes_gemini_api_key';
-  static const _kGeminiModel = 'eyes_gemini_model';
+  static const _kIaApiKey = 'eyes_ia_api_key';
+  static const _kIaModel = 'eyes_ia_model';
+  // Claves antiguas (época de Gemini) que se migran una sola vez.
+  static const _kAceptoGeminiViejo = 'eyes_acepto_gemini';
+  static const _kGeminiApiKeyViejo = 'eyes_gemini_api_key';
+  static const _kGeminiModelViejo = 'eyes_gemini_model';
+
+  /// Copia un valor de la clave vieja a la nueva si la nueva no existe.
+  static Future<void> _migrar(String claveVieja, String claveNueva) async {
+    final viejo = _prefs?.get(claveVieja);
+    if (viejo == null || _prefs?.containsKey(claveNueva) == true) return;
+    if (viejo is bool) {
+      await _prefs?.setBool(claveNueva, viejo);
+    } else if (viejo is String) {
+      await _prefs?.setString(claveNueva, viejo);
+    }
+    await _prefs?.remove(claveVieja);
+  }
+
+  /// Migra las claves guardadas en la época de Gemini a las de la IA.
+  static Future<void> migrarClavesIa() async {
+    await init();
+    await _migrar(_kAceptoGeminiViejo, _kAceptoIaNube);
+    await _migrar(_kGeminiApiKeyViejo, _kIaApiKey);
+    await _migrar(_kGeminiModelViejo, _kIaModel);
+  }
+  static const _kVolume = 'eyes_volume';
+  static const _kVibracion = 'eyes_vibracion';
+  static const _kContactos = 'eyes_contactos';
+  static const _kModeloPropio = 'eyes_modelo_propio';
+  static const _kUmbralConfianza = 'eyes_umbral_confianza';
+  static const _kNubeUrl = 'eyes_nube_url';
+  static const _kNubeKey = 'eyes_nube_key';
+  static const _kIdDispositivo = 'eyes_id_dispositivo';
+  static const _kContactosPendientes = 'eyes_contactos_pendientes';
+  static const _kConfigPendiente = 'eyes_config_pendiente';
+  static const _kBorradosPendientes = 'eyes_borrados_pendientes';
 
   // ---------- Nombre ----------
   static Future<void> setNombre(String nombre) async {
@@ -119,6 +155,181 @@ class StorageService {
     return _prefs?.getDouble(_kPitch) ?? AppConfig.defaultPitch;
   }
 
+  static Future<void> setVolume(double volume) async {
+    await init();
+    await _prefs?.setDouble(_kVolume, volume);
+  }
+
+  static Future<double> getVolume() async {
+    await init();
+    return _prefs?.getDouble(_kVolume) ?? 1.0;
+  }
+
+  // ---------- Vibración ----------
+  static Future<void> setVibracion(bool activa) async {
+    await init();
+    await _prefs?.setBool(_kVibracion, activa);
+  }
+
+  static Future<bool> getVibracion() async {
+    await init();
+    return _prefs?.getBool(_kVibracion) ?? true;
+  }
+
+  // ---------- Contactos de apoyo ----------
+  static Future<void> setContactos(List<ContactoApoyo> contactos) async {
+    await init();
+    final raw = jsonEncode(contactos.map((c) => c.toJson()).toList());
+    await _prefs?.setString(_kContactos, raw);
+  }
+
+  static Future<List<ContactoApoyo>> getContactos() async {
+    await init();
+    final raw = _prefs?.getString(_kContactos);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final lista = jsonDecode(raw) as List<dynamic>;
+      return lista
+          .map((e) => ContactoApoyo.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ---------- Nube (sincronización) ----------
+  static Future<void> setApiUrl(String url) async {
+    await init();
+    await _prefs?.setString(_kNubeUrl, url.trim());
+  }
+
+  static Future<String> getApiUrl() async {
+    await init();
+    return _prefs?.getString(_kNubeUrl) ?? '';
+  }
+
+  static Future<void> setApiKey(String key) async {
+    await init();
+    await _prefs?.setString(_kNubeKey, key.trim());
+  }
+
+  static Future<String> getApiKey() async {
+    await init();
+    return _prefs?.getString(_kNubeKey) ?? '';
+  }
+
+  /// Identificador único del dispositivo (uuid v4), generado una vez.
+  static Future<String> getIdDispositivo() async {
+    await init();
+    var id = _prefs?.getString(_kIdDispositivo);
+    if (id == null || id.isEmpty) {
+      id = Resultado.generarIdLocal();
+      await _prefs?.setString(_kIdDispositivo, id);
+    }
+    return id;
+  }
+
+  static Future<void> setContactosPendientes(bool v) async {
+    await init();
+    await _prefs?.setBool(_kContactosPendientes, v);
+  }
+
+  static Future<bool> getContactosPendientes() async {
+    await init();
+    return _prefs?.getBool(_kContactosPendientes) ?? false;
+  }
+
+  static Future<void> setConfigPendiente(bool v) async {
+    await init();
+    await _prefs?.setBool(_kConfigPendiente, v);
+  }
+
+  static Future<bool> getConfigPendiente() async {
+    await init();
+    return _prefs?.getBool(_kConfigPendiente) ?? false;
+  }
+
+  ///// Cola de borrados pendientes: `historial:*` o `guardado:` + idLocal.
+  static Future<List<String>> getBorradosPendientes() async {
+    await init();
+    return _prefs?.getStringList(_kBorradosPendientes) ?? [];
+  }
+
+  static Future<void> encolarBorrado(String clave) async {
+    await init();
+    final lista = await getBorradosPendientes();
+    if (!lista.contains(clave)) lista.add(clave);
+    await _prefs?.setStringList(_kBorradosPendientes, lista);
+  }
+
+  static Future<void> quitarBorrado(String clave) async {
+    await init();
+    final lista = await getBorradosPendientes();
+    lista.remove(clave);
+    await _prefs?.setStringList(_kBorradosPendientes, lista);
+  }
+
+  /// Marca como sincronizados los resultados cuyo idLocal está en la lista.
+  static Future<void> marcarHistorialSincronizado(List<String> ids) async {
+    await init();
+    final lista = await getHistorial();
+    var cambio = false;
+    for (final r in lista) {
+      if (ids.contains(r.idLocal) && !r.sincronizado) {
+        r.sincronizado = true;
+        cambio = true;
+      }
+    }
+    if (cambio) {
+      await _prefs?.setString(
+        _kHistorial,
+        jsonEncode(lista.map((e) => e.toJson()).toList()),
+      );
+    }
+  }
+
+  static Future<void> marcarGuardadosSincronizado(List<String> ids) async {
+    await init();
+    final lista = await getGuardados();
+    var cambio = false;
+    for (final r in lista) {
+      if (ids.contains(r.idLocal) && !r.sincronizado) {
+        r.sincronizado = true;
+        cambio = true;
+      }
+    }
+    if (cambio) {
+      await _prefs?.setString(
+        _kGuardados,
+        jsonEncode(lista.map((e) => e.toJson()).toList()),
+      );
+    }
+  }
+
+  // ---------- Modelo propio de detección ----------
+  static Future<void> setModeloPropio(bool activo) async {
+    await init();
+    await _prefs?.setBool(_kModeloPropio, activo);
+  }
+
+  static Future<bool> getModeloPropio() async {
+    await init();
+    return _prefs?.getBool(_kModeloPropio) ?? false;
+  }
+
+  // ---------- Umbral de confianza para anunciar ----------
+  static Future<void> setUmbralConfianza(double umbral) async {
+    await init();
+    await _prefs?.setDouble(_kUmbralConfianza, umbral);
+  }
+
+  static Future<double> getUmbralConfianza() async {
+    await init();
+    // EfficientDet-Lite0 int8 da 0.55-0.80 en objetos claros y de cerca;
+    // 0.70 descartaba aciertos reales y respondía "no estoy seguro".
+    return _prefs?.getDouble(_kUmbralConfianza) ?? 0.55;
+  }
+
   // ---------- Modo escucha continua ----------
   static Future<void> setEscuchaContinua(bool activo) async {
     await init();
@@ -141,14 +352,14 @@ class StorageService {
     return _prefs?.getBool(_kUsarIaNube) ?? false;
   }
 
-  static Future<void> setAceptoGemini(bool acepto) async {
+  static Future<void> setAceptoIaNube(bool acepto) async {
     await init();
-    await _prefs?.setBool(_kAceptoGemini, acepto);
+    await _prefs?.setBool(_kAceptoIaNube, acepto);
   }
 
-  static Future<bool> getAceptoGemini() async {
+  static Future<bool> getAceptoIaNube() async {
     await init();
-    return _prefs?.getBool(_kAceptoGemini) ?? false;
+    return _prefs?.getBool(_kAceptoIaNube) ?? false;
   }
 
   // ---------- Primer uso ----------
@@ -162,24 +373,24 @@ class StorageService {
     return _prefs?.getBool(_kPrimerUso) ?? false;
   }
 
-  // ---------- Gemini ----------
-  static Future<void> setGeminiApiKey(String key) async {
+  // ---------- IA en la nube ----------
+  static Future<void> setIaApiKey(String key) async {
     await init();
-    await _prefs?.setString(_kGeminiApiKey, key.trim());
+    await _prefs?.setString(_kIaApiKey, key.trim());
   }
 
-  static Future<String> getGeminiApiKey() async {
+  static Future<String> getIaApiKey() async {
     await init();
-    return _prefs?.getString(_kGeminiApiKey) ?? '';
+    return _prefs?.getString(_kIaApiKey) ?? '';
   }
 
-  static Future<void> setGeminiModel(String model) async {
+  static Future<void> setIaModel(String model) async {
     await init();
-    await _prefs?.setString(_kGeminiModel, model.trim());
+    await _prefs?.setString(_kIaModel, model.trim());
   }
 
-  static Future<String> getGeminiModel() async {
+  static Future<String> getIaModel() async {
     await init();
-    return _prefs?.getString(_kGeminiModel) ?? AppConfig.defaultGeminiModel;
+    return _prefs?.getString(_kIaModel) ?? '';
   }
 }

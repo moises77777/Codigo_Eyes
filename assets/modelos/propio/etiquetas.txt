@@ -1,0 +1,2 @@
+# Sustituye este archivo por las etiquetas de tu modelo propio.
+# Una etiqueta por linea, en espanol, en el mismo orden que el modelo.

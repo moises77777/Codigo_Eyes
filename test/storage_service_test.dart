@@ -54,10 +54,10 @@ void main() {
     });
 
     test('guarda clave API y modelo', () async {
-      await StorageService.setGeminiApiKey('clave123');
-      await StorageService.setGeminiModel('gemini-test');
-      expect(await StorageService.getGeminiApiKey(), 'clave123');
-      expect(await StorageService.getGeminiModel(), 'gemini-test');
+      await StorageService.setIaApiKey('clave123');
+      await StorageService.setIaModel('modelo-test');
+      expect(await StorageService.getIaApiKey(), 'clave123');
+      expect(await StorageService.getIaModel(), 'modelo-test');
     });
 
     test('primer uso', () async {

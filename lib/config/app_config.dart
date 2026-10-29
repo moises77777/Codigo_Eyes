@@ -4,21 +4,32 @@ import '../services/storage_service.dart';
 class AppConfig {
   AppConfig._();
 
-  // --- Gemini ---
-  static const String geminiBaseUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models';
-  static const String defaultGeminiModel = 'gemini-2.5-flash';
-  static const int geminiTimeoutSeconds = 20;
+  // --- IA en la nube (Anthropic Messages API) ---
+  static const String anthropicUrl = 'https://api.anthropic.com/v1/messages';
+  static const String anthropicVersion = '2023-06-01';
+  static const String defaultIaModel = 'claude-sonnet-5-5';
+  static const int iaTimeoutSeconds = 15;
   static const int maxImageDimension = 1024;
 
   /// Lee la API key: prioridad a la clave guardada en SharedPreferences,
-  /// luego a la variable de compilación --dart-define=GEMINI_API_KEY.
+  /// luego a la variable de compilación --dart-define=ANTHROPIC_API_KEY.
   static Future<String> getApiKey() async {
-    final guardada = await StorageService.getGeminiApiKey();
+    final guardada = await StorageService.getIaApiKey();
     if (guardada.trim().isNotEmpty) return guardada.trim();
 
-    const desdeDartDefine = String.fromEnvironment('GEMINI_API_KEY');
+    const desdeDartDefine = String.fromEnvironment('ANTHROPIC_API_KEY');
     return desdeDartDefine.trim();
+  }
+
+  /// Lee el modelo: Ajustes guardado, luego --dart-define=ANTHROPIC_MODEL,
+  /// luego el modelo por defecto.
+  static Future<String> getIaModel() async {
+    final guardado = await StorageService.getIaModel();
+    if (guardado.trim().isNotEmpty) return guardado.trim();
+
+    const desdeDartDefine = String.fromEnvironment('ANTHROPIC_MODEL');
+    if (desdeDartDefine.trim().isNotEmpty) return desdeDartDefine.trim();
+    return defaultIaModel;
   }
 
   // --- Voz ---
@@ -35,24 +46,27 @@ class AppConfig {
   // --- Historial ---
   static const int maxHistorial = 30;
 
-  // --- Instrucción del sistema para Gemini ---
+  // --- Instrucción del sistema para la IA en la nube ---
   static const String systemInstruction =
-      'Eres EYES, asistente para personas con discapacidad visual. '
-      'Responde siempre en español de México, de forma breve, clara y directa, '
-      'sin markdown, sin emojis ni listas, porque tu respuesta será leída en voz alta.';
+      'Eres EYES, un asistente para personas ciegas o con baja visión. '
+      'Responde siempre en español de México, con frases cortas y claras '
+      'pensadas para escucharse en voz alta. '
+      'No uses formato markdown, listas con símbolos ni emojis. '
+      'Si no puedes identificar algo con claridad, di "no estoy seguro" '
+      'en lugar de adivinar. '
+      'Nunca inventes marcas, textos, números ni cantidades que no se vean '
+      'claramente.';
 
   // --- Texto de ayuda leído por voz ---
   static const String textoAyuda =
-      'Di "qué es esto" para identificar un objeto. '
-      'Di "describe la escena" para saber qué hay alrededor. '
-      'Di "lee el texto" para leer un documento. '
-      'Di "resume" para resumir un texto largo. '
-      'Di "guarda esto" para recordar un objeto. '
-      'Di "historial" para las últimas identificaciones. '
-      'Di "guardados" para tus objetos guardados. '
-      'Di "más rápido" o "más lento" para cambiar la velocidad. '
-      'Di "detener" para cancelar lo actual. '
-      'Di "algoritmos" para la demostración de búsquedas. '
-      'Di "ayuda" para escuchar los comandos. '
-      'También puedes hacer cualquier pregunta sobre la imagen.';
+      'Para ver: di qué es esto, qué color es, qué billete es, describe todo, '
+      'lee el texto, o lee continuo. '
+      'Para moverte: di encuadrar, detección continua, o detener. '
+      'Para la cámara: di enciende la linterna, o apaga la linterna. '
+      'Para recordar: di guardar esto, historial, guardados, o repetir. '
+      'Para la nube: di sincronizar o respaldar. '
+      'Para pedir apoyo: di llama a y el nombre, pide ayuda, o agregar contacto. '
+      'Para ajustar: di más rápido, más lento, sube el volumen, baja el volumen, '
+      'quita la vibración, o mi nombre es. '
+      'También puedes decir qué hora es, algoritmos, o ayuda.';
 }

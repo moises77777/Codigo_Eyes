@@ -49,3 +49,28 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Vosk: reconocimiento de voz sin conexión (español).
+    // Reemplaza al SpeechRecognizer de Google, que en este Vivo falla
+    // porque no tiene el paquete offline de es-MX (error 12) y el
+    // reconocedor de red no devuelve resultados.
+    implementation("com.alphacephei:vosk-android:0.3.47")
+}
+
+// El plugin tflite_flutter compila Kotlin con un jvmTarget distinto al de
+// Java (25 vs 17) y rompe el build; se unifica a JVM 17 en todos los
+// subproyectos (plugins incluidos).
+rootProject.subprojects.forEach { subproyecto ->
+    subproyecto.tasks
+        .withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java)
+        .configureEach {
+            compilerOptions.jvmTarget.set(
+                org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17,
+            )
+        }
+    subproyecto.tasks.withType(JavaCompile::class.java).configureEach {
+        sourceCompatibility = "17"
+        targetCompatibility = "17"
+    }
+}

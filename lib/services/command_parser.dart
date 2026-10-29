@@ -8,8 +8,25 @@ enum Comando {
   repetir,
   historial,
   guardados,
+  sincronizar,
   borrarHistorial,
   deteccionContinua,
+  leerContinuo,
+  encuadrar,
+  billete,
+  color,
+  describirTodo,
+  agregarContacto,
+  llamar,
+  pedirAyuda,
+  misContactos,
+  eliminarContacto,
+  subirVolumen,
+  bajarVolumen,
+  quitarVibracion,
+  ponerVibracion,
+  linternaOn,
+  linternaOff,
   detener,
   masRapido,
   masLento,
@@ -127,6 +144,13 @@ class CommandParser {
       'mis objetos',
       'objetos guardados',
     ],
+    Comando.sincronizar: [
+      'sincronizar',
+      'sincroniza',
+      'sube mis datos',
+      'guardar en la nube',
+      'respaldar',
+    ],
     Comando.borrarHistorial: [
       'borrar historial',
       'eliminar historial',
@@ -139,6 +163,125 @@ class CommandParser {
       'automatico',
       'modo continuo',
       'detecta solo',
+    ],
+    Comando.leerContinuo: [
+      'lee continuo',
+      'lectura continua',
+      'lee todo el tiempo',
+      'lee seguido',
+      'modo lectura',
+      'lee en vivo',
+    ],
+    Comando.encuadrar: [
+      'encuadrar',
+      'ayudame a encuadrar',
+      'centrar',
+      'centra',
+      'guiame',
+      'guia de encuadre',
+      'ayudame a centrar',
+      'enfocar',
+    ],
+    Comando.billete: [
+      'que billete es',
+      'cuanto dinero es',
+      'que billete tengo',
+      'cuanto es este billete',
+      'identifica el billete',
+      'billete',
+      'cuanto dinero tengo',
+      'que billete',
+    ],
+    Comando.color: [
+      'que color es',
+      'de que color es',
+      'que color tiene',
+      'dime el color',
+      'color',
+      'que colores tiene',
+      'de que color',
+    ],
+    Comando.describirTodo: [
+      'que hay en la imagen',
+      'describe todo',
+      'que hay en la foto',
+      'que ves en la imagen',
+      'describeme todo',
+      'describe la imagen',
+    ],
+    Comando.agregarContacto: [
+      'agregar contacto',
+      'nuevo contacto',
+      'registrar contacto',
+      'agrega un contacto',
+      'guardar contacto',
+    ],
+    Comando.llamar: [
+      'llama a',
+      'llamar a',
+      'marca a',
+      'marcale a',
+      'llamale a',
+      'llama',
+    ],
+    Comando.pedirAyuda: [
+      'pide ayuda',
+      'necesito ayuda',
+      'emergencia',
+      'llama a mi contacto',
+      'auxilio',
+    ],
+    Comando.misContactos: [
+      'mis contactos',
+      'contactos de apoyo',
+      'que contactos tengo',
+      'lista de contactos',
+    ],
+    Comando.eliminarContacto: [
+      'eliminar contacto',
+      'borrar contacto',
+      'quitar contacto',
+    ],
+    Comando.subirVolumen: [
+      'sube el volumen',
+      'mas volumen',
+      'mas fuerte',
+      'volumen alto',
+      'sube volumen',
+    ],
+    Comando.bajarVolumen: [
+      'baja el volumen',
+      'menos volumen',
+      'mas bajo',
+      'volumen bajo',
+      'baja volumen',
+    ],
+    Comando.quitarVibracion: [
+      'quita la vibracion',
+      'sin vibracion',
+      'desactiva la vibracion',
+      'apaga la vibracion',
+      'quita vibracion',
+    ],
+    Comando.ponerVibracion: [
+      'activa la vibracion',
+      'pon la vibracion',
+      'con vibracion',
+      'enciende la vibracion',
+    ],
+    Comando.linternaOn: [
+      'enciende la linterna',
+      'prende la linterna',
+      'linterna',
+      'enciende la luz',
+      'prende la luz',
+      'activa la linterna',
+    ],
+    Comando.linternaOff: [
+      'apaga la linterna',
+      'apaga la luz',
+      'quita la linterna',
+      'desactiva la linterna',
     ],
     Comando.detener: [
       'detener',
@@ -224,15 +367,50 @@ class CommandParser {
       'confirmar',
       'confirmo',
       'adelante',
+      'afirmativo',
+      'asi es',
+      'exacto',
     ],
     Comando.no: [
       'no',
+      'nel',
       'negativo',
+      'incorrecto',
       'no gracias',
       'cancela',
       'no lo hagas',
+      'para nada',
     ],
   };
+
+  /// Variantes aceptadas como respuesta afirmativa en confirmaciones.
+  static const _afirmativas = {
+    'si', 'claro', 'correcto', 'afirmativo', 'dale', 'ok',
+    'esta bien', 'adelante', 'confirmar', 'asi es', 'exacto',
+  };
+
+  /// Variantes aceptadas como respuesta negativa en confirmaciones.
+  static const _negativas = {
+    'no', 'nel', 'negativo', 'incorrecto', 'no gracias',
+    'cancela', 'para nada',
+  };
+
+  /// True si [texto] empieza con una variante afirmativa.
+  /// El negativo se evalúa primero: 'no está bien' nunca es afirmativo.
+  static bool esAfirmativo(String texto) {
+    if (esNegativo(texto)) return false;
+    final t = _normalizar(texto);
+    if (t.isEmpty) return false;
+    return _afirmativas.any((v) => t == v || t.startsWith('$v '));
+  }
+
+  /// True si [texto] empieza con una variante negativa.
+  /// La comparación es por palabra completa: 'nombre' no es 'no'.
+  static bool esNegativo(String texto) {
+    final t = _normalizar(texto);
+    if (t.isEmpty) return false;
+    return _negativas.any((v) => t == v || t.startsWith('$v '));
+  }
 
   /// Analiza [texto] y devuelve el comando detectado.
   static ComandoVoz interpretar(String texto) {
@@ -244,6 +422,21 @@ class CommandParser {
         textoOriginal: original,
         confianza: 0,
       );
+    }
+
+    // Primero: coincidencia exacta con alguna variante. Así frases que
+    // empiezan como pregunta ('cuánto dinero tengo') pueden seguir
+    // ganando su comando ('billete') en vez de ir a la IA.
+    for (final entry in _variaciones.entries) {
+      for (final variacion in entry.value) {
+        if (normalizado == _normalizar(variacion)) {
+          return ComandoVoz(
+            comando: entry.key,
+            textoOriginal: original,
+            confianza: 1.0,
+          );
+        }
+      }
     }
 
     // Preguntas directas sobre la imagen.
@@ -266,7 +459,9 @@ class CommandParser {
         if (confianza > mejorConfianza) {
           mejorConfianza = confianza;
           mejorComando = entry.key;
-          if (entry.key == Comando.cambiarNombre) {
+          if (entry.key == Comando.cambiarNombre ||
+              entry.key == Comando.llamar ||
+              entry.key == Comando.eliminarContacto) {
             mejorArgumento = _extraerArgumento(normalizado, _normalizar(variacion));
           }
         }
@@ -320,12 +515,20 @@ class CommandParser {
 
     return ComandoVoz(
       comando: mejor,
-      argumento: mejor == Comando.cambiarNombre
+      argumento: (mejor == Comando.cambiarNombre ||
+              mejor == Comando.llamar ||
+              mejor == Comando.eliminarContacto)
           ? _extraerArgumento(texto, _normalizar(mejorVariacion!))
           : null,
       textoOriginal: texto,
       confianza: mejorSimilitud * 0.8,
     );
+  }
+
+  /// Similitud pública entre dos frases (normalizadas), útil para
+  /// comparar nombres de contactos con lo que se escuchó por voz.
+  static double similitudTexto(String a, String b) {
+    return _similitud(_normalizar(a), _normalizar(b));
   }
 
   /// Similitud entre dos textos: 1 - (distancia / largo mayor).
@@ -397,12 +600,10 @@ class CommandParser {
       'cuantos',
       'cuanta',
       'cuantas',
-      'de que color',
       'es',
       'hay',
       'cual',
       'cuales',
-      'que color',
       'donde',
       'quien',
       'por que',
@@ -426,7 +627,8 @@ class CommandParser {
 
   static double _calcularCoincidencia(String texto, String variacion) {
     if (texto == variacion) return 1.0;
-    if (texto.startsWith(variacion)) return 0.9;
+    // El prefijo debe terminar en palabra completa: 'llamame' no es 'llama'.
+    if (texto.startsWith('$variacion ')) return 0.9;
     if (variacion.startsWith(texto)) return 0.8;
     if (texto.contains(variacion)) {
       final ratio = variacion.length / texto.length;

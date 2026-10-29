@@ -14,3 +14,9 @@
 
 # Conectividad
 -keep class com.heyzap.** { *; }
+
+# Vosk (reconocimiento de voz offline)
+-keep class org.vosk.** { *; }
+-keep class com.sun.jna.** { *; }
+-dontwarn org.vosk.**
+-dontwarn com.sun.jna.**

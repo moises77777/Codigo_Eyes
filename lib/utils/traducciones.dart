@@ -90,7 +90,10 @@ class Traducciones {
     'hat': 'sombrero',
 
     // --- Etiquetas genéricas frecuentes de ML Kit ---
-    'fashion good': 'artículo de moda',
+    'fashion good': 'prenda o accesorio',
+    'home good': 'artículo del hogar',
+    'place': 'lugar',
+    'good': 'objeto',
     'furniture': 'mueble',
     'table': 'mesa',
     'plant': 'planta',
@@ -422,14 +425,11 @@ class Traducciones {
     'first aid': 'primeros auxilios',
   };
 
-  /// Traduce [etiqueta] al español. Si no existe, devuelve la palabra original
-  /// con la primera letra mayúscula para facilitar la lectura en voz alta.
+  /// Traduce [etiqueta] al español. Si no existe en el diccionario,
+  /// devuelve 'objeto' para no leer inglés en voz alta.
   static String traducir(String etiqueta) {
     final clave = etiqueta.toLowerCase().trim();
-    final traducida = _mapa[clave];
-    if (traducida != null) return traducida;
-    if (clave.isEmpty) return 'objeto';
-    return clave[0].toUpperCase() + clave.substring(1);
+    return _mapa[clave] ?? 'objeto';
   }
 
   /// Devuelve true si la etiqueta ya está en el diccionario.

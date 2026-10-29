@@ -74,6 +74,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     widget.controller.autoEscucha = false;
+    // Apagar la linterna al salir de la pantalla principal.
+    widget.controller.cameraService.setLinterna(false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -151,10 +153,57 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _vistaCamara() {
     final controller = widget.controller.cameraService.controller;
 
+    // Sin cámara: pantalla de error limpia, sin preview ni marco.
+    if (_errorCamara != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          color: Colors.black,
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.videocam_off,
+                    color: Colors.white, size: 80),
+                const SizedBox(height: 24),
+                Text(
+                  _errorCamara!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Semantics(
+                  label: 'Reintentar abrir la cámara',
+                  button: true,
+                  child: SizedBox(
+                    height: 64,
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _initCamara,
+                      child: const Text(
+                        'Reintentar',
+                        style: TextStyle(fontSize: 22),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: GestureDetector(
-        onTap: () => widget.controller.iniciarEscucha(),
+        onTap: () => widget.controller.iniciarEscucha(manual: true),
         onLongPress: () => widget.controller.repetirUltimo(),
         child: Container(
           color: Colors.black,
@@ -165,29 +214,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               if (controller != null && controller.value.isInitialized)
                 CameraPreview(controller)
               else
-                Center(
+                const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.videocam_off,
+                      Icon(Icons.videocam,
                           color: Colors.white54, size: 64),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       Text(
-                        _errorCamara ?? 'Iniciando cámara…',
-                        style: const TextStyle(
+                        'Iniciando cámara…',
+                        style: TextStyle(
                           color: Colors.white70,
                           fontSize: 18,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      if (_errorCamara != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: ElevatedButton(
-                            onPressed: _initCamara,
-                            child: const Text('Reintentar'),
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -202,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     if (widget.controller.estado == EstadoEyes.escuchando) {
                       widget.controller.detenerEscucha();
                     } else {
-                      widget.controller.iniciarEscucha();
+                      widget.controller.iniciarEscucha(manual: true);
                     }
                   },
                 ),

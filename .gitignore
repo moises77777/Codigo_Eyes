@@ -54,3 +54,9 @@ app.*.map.json
 *.key
 api_keys.txt
 secrets.json
+
+# Credenciales locales (nunca subir)
+dart_defines.json
+.env
+!.env.example
+nul
