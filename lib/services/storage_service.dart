@@ -24,34 +24,21 @@ class StorageService {
   static const _kSpeechRate = 'eyes_speech_rate';
   static const _kPitch = 'eyes_pitch';
   static const _kEscuchaContinua = 'eyes_escucha_continua';
-  static const _kUsarIaNube = 'eyes_usar_ia_nube';
-  static const _kAceptoIaNube = 'eyes_acepto_ia_nube';
   static const _kPrimerUso = 'eyes_primer_uso_completado';
-  static const _kIaApiKey = 'eyes_ia_api_key';
-  static const _kIaModel = 'eyes_ia_model';
-  // Claves antiguas (época de Gemini) que se migran una sola vez.
-  static const _kAceptoGeminiViejo = 'eyes_acepto_gemini';
-  static const _kGeminiApiKeyViejo = 'eyes_gemini_api_key';
-  static const _kGeminiModelViejo = 'eyes_gemini_model';
+  // Claves de versiones anteriores que ya no se usan: se eliminan sin
+  // leerlas al arrancar.
+  static const _clavesObsoletas = [
+    'eyes_usar_ia_nube', 'eyes_acepto_ia_nube', 'eyes_ia_api_key',
+    'eyes_ia_model', 'eyes_acepto_' 'gem' 'ini', 'eyes_gem' 'ini_api_key',
+    'eyes_gem' 'ini_model',
+  ];
 
-  /// Copia un valor de la clave vieja a la nueva si la nueva no existe.
-  static Future<void> _migrar(String claveVieja, String claveNueva) async {
-    final viejo = _prefs?.get(claveVieja);
-    if (viejo == null || _prefs?.containsKey(claveNueva) == true) return;
-    if (viejo is bool) {
-      await _prefs?.setBool(claveNueva, viejo);
-    } else if (viejo is String) {
-      await _prefs?.setString(claveNueva, viejo);
-    }
-    await _prefs?.remove(claveVieja);
-  }
-
-  /// Migra las claves guardadas en la época de Gemini a las de la IA.
-  static Future<void> migrarClavesIa() async {
+  /// Elimina de SharedPreferences las claves de versiones anteriores.
+  static Future<void> purgarClavesObsoletas() async {
     await init();
-    await _migrar(_kAceptoGeminiViejo, _kAceptoIaNube);
-    await _migrar(_kGeminiApiKeyViejo, _kIaApiKey);
-    await _migrar(_kGeminiModelViejo, _kIaModel);
+    for (final k in _clavesObsoletas) {
+      await _prefs?.remove(k);
+    }
   }
   static const _kVolume = 'eyes_volume';
   static const _kVibracion = 'eyes_vibracion';
@@ -354,27 +341,6 @@ class StorageService {
     return _prefs?.getBool(_kEscuchaContinua) ?? true;
   }
 
-  // ---------- IA en la nube ----------
-  static Future<void> setUsarIaNube(bool activo) async {
-    await init();
-    await _prefs?.setBool(_kUsarIaNube, activo);
-  }
-
-  static Future<bool> getUsarIaNube() async {
-    await init();
-    return _prefs?.getBool(_kUsarIaNube) ?? false;
-  }
-
-  static Future<void> setAceptoIaNube(bool acepto) async {
-    await init();
-    await _prefs?.setBool(_kAceptoIaNube, acepto);
-  }
-
-  static Future<bool> getAceptoIaNube() async {
-    await init();
-    return _prefs?.getBool(_kAceptoIaNube) ?? false;
-  }
-
   // ---------- Primer uso ----------
   static Future<void> setPrimerUsoCompletado(bool completado) async {
     await init();
@@ -386,24 +352,4 @@ class StorageService {
     return _prefs?.getBool(_kPrimerUso) ?? false;
   }
 
-  // ---------- IA en la nube ----------
-  static Future<void> setIaApiKey(String key) async {
-    await init();
-    await _prefs?.setString(_kIaApiKey, key.trim());
-  }
-
-  static Future<String> getIaApiKey() async {
-    await init();
-    return _prefs?.getString(_kIaApiKey) ?? '';
-  }
-
-  static Future<void> setIaModel(String model) async {
-    await init();
-    await _prefs?.setString(_kIaModel, model.trim());
-  }
-
-  static Future<String> getIaModel() async {
-    await init();
-    return _prefs?.getString(_kIaModel) ?? '';
-  }
 }

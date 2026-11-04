@@ -16,7 +16,7 @@ EYES es una aplicación Android pensada para personas con discapacidad visual. P
 - Identificación de objetos en tiempo real con TensorFlow Lite (EfficientDet-Lite0, 90 clases COCO), 100 % en el teléfono.
 - Reconocimiento de voz en español **sin conexión** con Vosk (no depende de los servicios de Google).
 - OCR local para leer documentos y etiquetas.
-- Descripción de escenas y preguntas sobre la imagen con una IA en la nube (API de mensajes de Anthropic, modo híbrido).
+- Descripción de escenas y preguntas sobre la imagen con los modelos propios del equipo (backend EYES).
 - Identificación de billetes mexicanos y color dominante.
 - Control total por voz con escucha continua y comandos en español de México.
 - Historial de resultados y lista de objetos guardados, con sincronización a MongoDB Atlas vía la API de `api/`.
@@ -33,7 +33,7 @@ EYES es una aplicación Android pensada para personas con discapacidad visual. P
 - `flutter_tts` — síntesis de voz.
 - `permission_handler` — permisos de cámara y micrófono.
 - `shared_preferences` — datos persistentes.
-- `http` — llamadas REST a la API de Anthropic.
+- `http` — llamadas REST al backend EYES (IA propia).
 - `connectivity_plus` — estado de la conexión.
 - `provider` — gestión de estado.
 
@@ -77,27 +77,10 @@ lib/
     └── boton_microfono.dart
 ```
 
-## Obtener la API key de Anthropic
+## Conectar con el backend EYES
 
-1. Entra a https://console.anthropic.com/
-2. Inicia sesión con tu cuenta.
-3. Crea una nueva API key y cópiala.
-
-La clave se puede proporcionar de dos formas:
-
-- **En tiempo de compilación** con un archivo de defines (recomendado):
-  ```json
-  // dart_defines.json (está en .gitignore, no se sube al repo)
-  {
-    "ANTHROPIC_API_KEY": "TU_CLAVE",
-    "ANTHROPIC_MODEL": "claude-sonnet-5-5"
-  }
-  ```
-  ```bash
-  flutter run --dart-define-from-file=dart_defines.json
-  flutter build apk --release --dart-define-from-file=dart_defines.json
-  ```
-- **En la app**: ve a Ajustes → Clave de la IA en la nube, pega la clave y guarda. Esta opción tiene prioridad sobre la de compilación.
+1. Levanta el backend (`eyes/backend`, `uvicorn app.main:app --host 0.0.0.0`).
+2. En la app: Ajustes → Servidor EYES → URL + correo/contraseña → Iniciar sesión.
 
 ## Ejecutar en desarrollo
 

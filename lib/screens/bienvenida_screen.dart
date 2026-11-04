@@ -5,7 +5,7 @@ import '../controllers/eyes_controller.dart';
 import '../services/permission_service.dart';
 
 /// Bienvenida 100 % por voz: pide el nombre, los permisos y el
-/// consentimiento de la IA en la nube sin necesidad de ver la pantalla.
+/// permisos, todo por voz sin necesidad de ver la pantalla.
 /// El campo de texto solo queda como respaldo por si el micrófono falla.
 class BienvenidaScreen extends StatefulWidget {
   final EyesController controller;
@@ -117,30 +117,10 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
         guardarRespuesta: false,
       );
     }
-    await _pasoIaNube();
+    await _finalizar();
   }
 
-  Future<void> _pasoIaNube() async {
-    setState(() => _paso = 2);
-    final acepta = await widget.controller.pedirConfirmacion(
-      'Para descripciones más completas puedo enviar fotos a una inteligencia artificial en la nube. '
-      'Las imágenes no se guardan en ningún lado. ¿Lo permites? Di sí o no.',
-    );
-    if (!mounted) return;
-
-    if (acepta == null) {
-      await widget.controller.hablar(
-        'No te escuché. Uso los botones de la pantalla. '
-        'Toca sí para permitir o no para rechazar.',
-        guardarRespuesta: false,
-      );
-      return;
-    }
-
-    await _finalizar(acepta);
-  }
-
-  Future<void> _finalizar(bool aceptaIaNube) async {
+  Future<void> _finalizar() async {
     final nombre = _nombreVoz.isNotEmpty
         ? _nombreVoz
         : _nombreController.text.trim();
@@ -151,7 +131,7 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
       );
       return;
     }
-    await widget.controller.finalizarBienvenida(nombre, aceptaIaNube);
+    await widget.controller.finalizarBienvenida(nombre);
     await widget.controller.hablar(
       'Perfecto, $nombre. EYES está listo. Te espero en la pantalla principal.',
       guardarRespuesta: false,
@@ -238,18 +218,6 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
                   child: const Text('Continuar'),
                 ),
               ],
-              // Respaldo visual: botones para el consentimiento de la IA.
-              if (_paso == 2) ...[
-                ElevatedButton(
-                  onPressed: () => _finalizar(true),
-                  child: const Text('Sí, permitir IA en la nube'),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () => _finalizar(false),
-                  child: const Text('No, gracias'),
-                ),
-              ],
             ],
           ),
         ),
@@ -263,8 +231,6 @@ class _BienvenidaScreenState extends State<BienvenidaScreen> {
         return '¿Cómo te llamas?';
       case 1:
         return 'Permisos de cámara';
-      case 2:
-        return '¿Usar IA en la nube?';
       default:
         return 'Listo';
     }

@@ -160,8 +160,6 @@ class SincronizacionService {
       'tono': await StorageService.getPitch(),
       'volumen': await StorageService.getVolume(),
       'vibracion': await StorageService.getVibracion(),
-      'usar_ia_nube': await StorageService.getUsarIaNube(),
-      'acepto_ia_nube': await StorageService.getAceptoIaNube(),
       'modelo_propio': await StorageService.getModeloPropio(),
       'umbral_confianza': await StorageService.getUmbralConfianza(),
     });
@@ -201,7 +199,6 @@ class SincronizacionService {
           {'clave': 'tono', 'valor': '${await StorageService.getPitch()}'},
           {'clave': 'volumen', 'valor': '${await StorageService.getVolume()}'},
           {'clave': 'vibracion', 'valor': '${await StorageService.getVibracion()}'},
-          {'clave': 'usar_ia_nube', 'valor': '${await StorageService.getUsarIaNube()}'},
           {'clave': 'modelo_propio', 'valor': '${await StorageService.getModeloPropio()}'},
           {'clave': 'umbral_confianza', 'valor': '${await StorageService.getUmbralConfianza()}'},
         ],
@@ -244,7 +241,6 @@ class SincronizacionService {
                 'tipo': r.tipo,
                 'texto': r.texto,
                 'confianza': r.confianza == 0 ? null : r.confianza,
-                'uso_ia_nube': r.usoIaNube,
                 'fecha_hora': DateTime.now().toIso8601String(),
               })
           .toList(),

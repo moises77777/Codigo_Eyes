@@ -9,7 +9,6 @@ class Resultado {
   final String fecha;
   final String hora;
   final double confianza;
-  final bool usoIaNube;
   bool sincronizado;
 
   Resultado({
@@ -20,7 +19,6 @@ class Resultado {
     required this.fecha,
     required this.hora,
     this.confianza = 0,
-    this.usoIaNube = false,
     this.sincronizado = false,
   }) : idLocal = idLocal ?? generarIdLocal();
 
@@ -41,7 +39,6 @@ class Resultado {
     required String tipo,
     required String texto,
     double confianza = 0,
-    bool usoIaNube = false,
   }) {
     final ahora = DateTime.now();
     final id = '${ahora.microsecondsSinceEpoch}';
@@ -52,7 +49,6 @@ class Resultado {
       fecha: _formatearFecha(ahora),
       hora: _formatearHora(ahora),
       confianza: confianza,
-      usoIaNube: usoIaNube,
     );
   }
 
@@ -65,7 +61,6 @@ class Resultado {
       'fecha': fecha,
       'hora': hora,
       'confianza': confianza,
-      'usoIaNube': usoIaNube,
       'sincronizado': sincronizado,
     };
   }
@@ -80,7 +75,6 @@ class Resultado {
       fecha: json['fecha'] as String? ?? '',
       hora: json['hora'] as String? ?? '',
       confianza: (json['confianza'] as num?)?.toDouble() ?? 0,
-      usoIaNube: json['usoIaNube'] as bool? ?? false,
       sincronizado: json['sincronizado'] as bool? ?? false,
     );
   }
@@ -110,7 +104,6 @@ class Resultado {
     String? fecha,
     String? hora,
     double? confianza,
-    bool? usoIaNube,
   }) {
     return Resultado(
       id: id ?? this.id,
@@ -120,7 +113,6 @@ class Resultado {
       fecha: fecha ?? this.fecha,
       hora: hora ?? this.hora,
       confianza: confianza ?? this.confianza,
-      usoIaNube: usoIaNube ?? this.usoIaNube,
       sincronizado: sincronizado,
     );
   }

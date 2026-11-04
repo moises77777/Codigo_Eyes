@@ -4,6 +4,7 @@ import '../config/app_config.dart';
 import '../controllers/eyes_controller.dart';
 import '../models/contacto_apoyo.dart';
 import '../services/sincronizacion_service.dart';
+import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/tts_service.dart';
 
@@ -23,14 +24,16 @@ class _AjustesScreenState extends State<AjustesScreen> {
   double _volume = 1.0;
   bool _escuchaContinua = true;
   bool _vibracion = true;
-  bool _usarIa = false;
   bool _modeloPropio = false;
   double _umbral = 0.70;
   final _urlController = TextEditingController();
   final _claveNubeController = TextEditingController();
   String _textoSincronizacion = 'Última sincronización: todavía no. Pendientes: 0.';
-  final _apiKeyController = TextEditingController(); // IA externa eliminada
-  final _modeloController = TextEditingController(text: '');
+  final _eyesUrlController = TextEditingController();
+  final _correoController = TextEditingController();
+  final _passController = TextEditingController();
+  String _ocrMotor = 'mlkit';
+  bool _sesionActiva = false;
   final _nombreController = TextEditingController();
 
   @override
@@ -45,17 +48,14 @@ class _AjustesScreenState extends State<AjustesScreen> {
     _volume = TtsService.volume;
     _escuchaContinua = widget.controller.escuchaContinua;
     _vibracion = widget.controller.vibracionActivada;
-    _usarIa = widget.controller.usarIaNube;
     _modeloPropio = await StorageService.getModeloPropio();
     _umbral = await StorageService.getUmbralConfianza();
     _urlController.text = await StorageService.getApiUrl();
     final claveNube = await StorageService.getApiKey();
     _claveNubeController.text = _enmascarar(claveNube);
-    final key = await StorageService.getIaApiKey();
-    _apiKeyController.text = _enmascarar(key);
-    final modelo = await StorageService.getIaModel();
-    _modeloController.text =
-        modelo;
+    _eyesUrlController.text = await ApiService.baseUrl();
+    _ocrMotor = await StorageService.getOcrMotor();
+    _sesionActiva = (await ApiService.token()) != null;
     _nombreController.text = widget.controller.nombreUsuario;
     SincronizacionService.onCambio = _actualizarTextoSync;
     setState(() {});
@@ -82,36 +82,29 @@ class _AjustesScreenState extends State<AjustesScreen> {
     return '${key.substring(0, 4)}${'*' * (key.length - 8)}${key.substring(key.length - 4)}';
   }
 
-  Future<void> _guardarApiKey() async {
-    // Quitar espacios y saltos por si la clave se pegó con caracteres extra.
-    final raw = _apiKeyController.text.replaceAll(RegExp(r'\s'), '');
-    // Si el usuario escribió asteriscos, no borramos la clave existente.
-    if (!raw.contains('*')) {
-      await widget.controller.setApiKey(raw);
-    }
-    final modelo = _modeloController.text.trim();
-    if (modelo.isNotEmpty) {
-      await widget.controller.setIaModel(modelo);
-    }
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Configuración de IA guardada.')),
-      );
-    }
+  Future<void> _guardarServidorEyes() async {
+    await ApiService.setBaseUrl(_eyesUrlController.text);
+    await widget.controller.hablar('Servidor EYES guardado.',
+        guardarRespuesta: false);
   }
 
-  /// Llama a la IA en la nube con la clave guardada y dice el resultado
-  /// en voz alta, para saber si la clave y el modelo funcionan.
-  Future<void> _probarConexion() async {
-    await widget.controller.hablar('Probando conexión con la IA…',
+  Future<void> _iniciarSesion() async {
+    await ApiService.setBaseUrl(_eyesUrlController.text);
+    final ok = await ApiService.login(
+        _correoController.text.trim(), _passController.text);
+    if (!mounted) return;
+    setState(() => _sesionActiva = ok);
+    await widget.controller.hablar(
+        ok ? 'Sesión iniciada en el servidor EYES.'
+           : 'No pude iniciar sesión. Revisa el correo, la contraseña y la URL.',
         guardarRespuesta: false);
-    final resultado = 'La IA externa ya no se usa en EYES.';
-    await widget.controller.hablar(resultado, guardarRespuesta: false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resultado)),
-      );
-    }
+  }
+
+  Future<void> _cerrarSesion() async {
+    await ApiService.logout();
+    if (!mounted) return;
+    setState(() => _sesionActiva = false);
+    await widget.controller.hablar('Sesión cerrada.', guardarRespuesta: false);
   }
 
   Future<void> _cambiarNombre() async {
@@ -320,24 +313,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
               },
             ),
           ),
-          SwitchListTile(
-            title: const Text(
-              'Usar IA en la nube',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-            subtitle: const Text(
-              'Envía fotos a una inteligencia artificial en la nube para descripciones más completas.',
-              style: TextStyle(color: Colors.white70),
-            ),
-            value: _usarIa,
-            onChanged: (v) async {
-              setState(() => _usarIa = v);
-              await widget.controller.setUsarIaNube(v);
-              if (v) {
-                await widget.controller.setAceptoIaNube(true);
-              }
-            },
-          ),
           const Divider(),
           Text(
             'Nube',
@@ -460,37 +435,66 @@ class _AjustesScreenState extends State<AjustesScreen> {
           ),
           const Divider(),
           Text(
-            'Inteligencia artificial',
+            'Servidor EYES (IA propia)',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: _apiKeyController,
+            controller: _eyesUrlController,
             style: const TextStyle(color: Colors.white, fontSize: 18),
             decoration: const InputDecoration(
-              labelText: 'Clave de la IA en la nube (Anthropic)',
-              hintText: 'Pega aquí tu clave',
+              labelText: 'URL del servidor EYES',
+              hintText: 'http://192.168.1.10:8000',
             ),
-            obscureText: true,
+            keyboardType: TextInputType.url,
           ),
           const SizedBox(height: 8),
           TextField(
-            controller: _modeloController,
+            controller: _correoController,
             style: const TextStyle(color: Colors.white, fontSize: 18),
-            decoration: const InputDecoration(
-              labelText: 'Modelo',
-            ),
+            decoration: const InputDecoration(labelText: 'Correo'),
+            keyboardType: TextInputType.emailAddress,
           ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _guardarApiKey,
-            child: const Text('Guardar clave API'),
+          TextField(
+            controller: _passController,
+            style: const TextStyle(color: Colors.white, fontSize: 18),
+            decoration: const InputDecoration(labelText: 'Contraseña'),
+            obscureText: true,
           ),
           const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: _probarConexion,
-            icon: const Icon(Icons.wifi_tethering),
-            label: const Text('Probar conexión con la IA'),
+          Row(children: [
+            Expanded(child: OutlinedButton.icon(
+              onPressed: _guardarServidorEyes,
+              icon: const Icon(Icons.save),
+              label: const Text('Guardar URL'),
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: ElevatedButton.icon(
+              onPressed: _sesionActiva ? _cerrarSesion : _iniciarSesion,
+              icon: Icon(_sesionActiva ? Icons.logout : Icons.login),
+              label: Text(_sesionActiva ? 'Cerrar sesión' : 'Iniciar sesión'),
+            )),
+          ]),
+          const SizedBox(height: 12),
+          Semantics(
+            label: 'Motor de lectura de texto',
+            child: DropdownButtonFormField<String>(
+              initialValue: _ocrMotor,
+              dropdownColor: Colors.black,
+              style: const TextStyle(color: Colors.white, fontSize: 18),
+              decoration: const InputDecoration(labelText: 'Lector de texto'),
+              items: const [
+                DropdownMenuItem(value: 'mlkit',
+                    child: Text('En el teléfono (ML Kit, rápido)')),
+                DropdownMenuItem(value: 'servidor',
+                    child: Text('OCR propio EYES (servidor)')),
+              ],
+              onChanged: (v) async {
+                if (v == null) return;
+                setState(() => _ocrMotor = v);
+                await StorageService.setOcrMotor(v);
+              },
+            ),
           ),
           const Divider(),
           Text(
@@ -567,8 +571,9 @@ class _AjustesScreenState extends State<AjustesScreen> {
 
   @override
   void dispose() {
-    _apiKeyController.dispose();
-    _modeloController.dispose();
+    _eyesUrlController.dispose();
+    _correoController.dispose();
+    _passController.dispose();
     _nombreController.dispose();
     _urlController.dispose();
     _claveNubeController.dispose();
