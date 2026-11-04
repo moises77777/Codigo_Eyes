@@ -176,6 +176,19 @@ class StorageService {
     return _prefs?.getBool(_kVibracion) ?? true;
   }
 
+  // ---------- Motor de OCR: 'mlkit' (local, por defecto) o 'servidor'
+  // (nuestro OCR propio en el backend) ----------
+  static const _kOcrMotor = 'eyes_ocr_motor';
+  static Future<void> setOcrMotor(String motor) async {
+    await init();
+    await _prefs?.setString(_kOcrMotor, motor);
+  }
+
+  static Future<String> getOcrMotor() async {
+    await init();
+    return _prefs?.getString(_kOcrMotor) ?? 'mlkit';
+  }
+
   // ---------- Contactos de apoyo ----------
   static Future<void> setContactos(List<ContactoApoyo> contactos) async {
     await init();

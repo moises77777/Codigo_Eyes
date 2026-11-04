@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../config/app_config.dart';
 import '../models/contacto_apoyo.dart';
 import '../models/resultado.dart';
+import '../services/api_service.dart';
 import '../services/billetes_service.dart';
 import '../services/camera_service.dart';
 import '../services/color_service.dart';
@@ -18,6 +19,7 @@ import '../services/command_parser.dart';
 import '../services/ia_nube_service.dart';
 import '../services/ocr_service.dart';
 import '../services/storage_service.dart';
+import '../services/texto_datos.dart';
 import '../services/sincronizacion_service.dart';
 import '../services/tts_service.dart';
 import '../services/detector_service.dart';
@@ -53,6 +55,7 @@ class EyesController extends ChangeNotifier {
   String _mensajeEstado = 'Listo para ayudarte';
   String _ultimoComandoEscuchado = '';
   Resultado? _ultimoResultado;
+  String? _ultimoEscaneoId;   // id de escaneo en el backend propio
   List<Resultado> _historial = [];
   List<Resultado> _guardados = [];
   String _nombreUsuario = '';
@@ -827,6 +830,23 @@ class EyesController extends ChangeNotifier {
         return;
       }
 
+      // Investigación propia primero: nuestro backend (modelos
+      // entrenados por el equipo). Si no hay conexión o token, el
+      // detector local responde como respaldo.
+      final respApi = await ApiService.inferir('reconocer/objeto', ruta);
+      if (respApi != null && respApi['texto_para_voz'] != null) {
+        _ultimoEscaneoId = respApi['id_escaneo'] as String?;
+        final mensaje = respApi['texto_para_voz'] as String;
+        await _guardarEnHistorial(Resultado.ahora(
+            tipo: 'identificar', texto: mensaje, usoIaNube: false));
+        Latencia.fin('identificar', sw);
+        await hablar(mensaje);
+        if (!_tiempoRealActivo) {
+          _setEstado(EstadoEyes.listo, 'Listo para ayudarte');
+        }
+        return;
+      }
+
       final detecciones = await DetectorService.detectarFoto(ruta);
       final validas = detecciones
           .where((d) => d.etiqueta != 'objeto')
@@ -884,12 +904,29 @@ class EyesController extends ChangeNotifier {
         return;
       }
 
-      final texto = await OcrService.leerTexto(ruta);
+      // Lectura: ML Kit local (lector principal, permitido) u OCR
+      // propio del servidor según el ajuste ocr_motor. La
+      // interpretación de lo leído siempre es nuestra.
+      final motor = await StorageService.getOcrMotor();
       String mensaje;
-      if (texto.isEmpty) {
-        mensaje = 'No encuentro texto. Acerca el documento y mejora la iluminación.';
+      if (motor == 'servidor') {
+        final respApi = await ApiService.inferir('leer/texto', ruta);
+        if (respApi != null && respApi['texto_para_voz'] != null) {
+          _ultimoEscaneoId = respApi['id_escaneo'] as String?;
+          mensaje = respApi['texto_para_voz'] as String;
+        } else {
+          mensaje = 'No pude leer con el servidor. Revisa la conexión.';
+        }
       } else {
-        mensaje = texto;
+        final texto = await OcrService.leerTexto(ruta);
+        if (texto.isEmpty) {
+          mensaje = 'No encuentro texto. Acerca el documento y mejora la iluminación.';
+        } else {
+          final clave = DatosTexto.resumenClave(texto);
+          mensaje = clave.startsWith('Leí texto')
+              ? texto
+              : '$texto. $clave';
+        }
       }
 
       await _guardarEnHistorial(
@@ -937,6 +974,20 @@ class EyesController extends ChangeNotifier {
   }
 
   Future<void> preguntarSobreImagen(String pregunta) async {
+    // Pregunta de seguimiento sobre el último escaneo: intención
+    // propia en el backend (investigación 100% nuestra).
+    if (_ultimoEscaneoId != null) {
+      final resp = await ApiService.preguntar(_ultimoEscaneoId!, pregunta);
+      if (resp != null) {
+        await _guardarEnHistorial(Resultado.ahora(
+            tipo: 'pregunta', texto: resp, usoIaNube: false));
+        await hablar(resp);
+        if (!_tiempoRealActivo) {
+          _setEstado(EstadoEyes.listo, 'Listo para ayudarte');
+        }
+        return;
+      }
+    }
     if (!iaNubeDisponible) {
       await hablar('No puedo consultar a la IA sin conexión o sin permiso. Revisa los ajustes.');
       return;
@@ -1018,6 +1069,18 @@ class EyesController extends ChangeNotifier {
         return;
       }
 
+      final porBackend = await _billeteBackend(ruta);
+      if (porBackend != null) {
+        await _guardarEnHistorial(Resultado.ahora(
+            tipo: 'billete', texto: porBackend, usoIaNube: false));
+        Latencia.fin('billete', sw);
+        await hablar(porBackend);
+        if (!_tiempoRealActivo) {
+          _setEstado(EstadoEyes.listo, 'Listo para ayudarte');
+        }
+        return;
+      }
+
       final billete = await BilletesService.identificar(ruta);
       String mensaje;
       var usoIa = false;
@@ -1056,6 +1119,17 @@ class EyesController extends ChangeNotifier {
   }
 
   /// Dice el color dominante de lo que está frente a la cámara.
+  /// Billete por nuestra CNN propia en el backend; null si no hay
+  /// conexión (y sigue el flujo local de respaldo).
+  Future<String?> _billeteBackend(String ruta) async {
+    final respApi = await ApiService.inferir('reconocer/billete', ruta);
+    if (respApi != null && respApi['texto_para_voz'] != null) {
+      _ultimoEscaneoId = respApi['id_escaneo'] as String?;
+      return respApi['texto_para_voz'] as String;
+    }
+    return null;
+  }
+
   Future<void> identificarColor() async {
     if (_ocupado) return;
     _ocupado = true;
@@ -1647,6 +1721,15 @@ class EyesController extends ChangeNotifier {
   /// Sincroniza los datos pendientes con la nube ahora (comando de voz
   /// 'sincronizar' y botón 'Sincronizar ahora' de Ajustes).
   Future<void> sincronizarAhora() async {
+    // Baja los modelos propios activos (.tflite) para el modo
+    // dispositivo, además de la sincronización del historial.
+    int bajados = 0;
+    for (final tarea in ['objeto', 'billete', 'voz', 'encuadre']) {
+      if (await ApiService.descargarModelo(tarea) != null) bajados++;
+    }
+    if (bajados > 0) {
+      await hablar('$bajados modelos propios descargados al teléfono.');
+    }
     final url = await SincronizacionService.urlConfigurada();
     if (url.isEmpty) {
       await hablar(
