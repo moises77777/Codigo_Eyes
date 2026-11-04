@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../config/app_config.dart';
 import '../controllers/eyes_controller.dart';
 import '../models/contacto_apoyo.dart';
-import '../services/ia_nube_service.dart';
 import '../services/sincronizacion_service.dart';
 import '../services/storage_service.dart';
 import '../services/tts_service.dart';
@@ -30,8 +29,8 @@ class _AjustesScreenState extends State<AjustesScreen> {
   final _urlController = TextEditingController();
   final _claveNubeController = TextEditingController();
   String _textoSincronizacion = 'Última sincronización: todavía no. Pendientes: 0.';
-  final _apiKeyController = TextEditingController();
-  final _modeloController = TextEditingController(text: AppConfig.defaultIaModel);
+  final _apiKeyController = TextEditingController(); // IA externa eliminada
+  final _modeloController = TextEditingController(text: '');
   final _nombreController = TextEditingController();
 
   @override
@@ -56,7 +55,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
     _apiKeyController.text = _enmascarar(key);
     final modelo = await StorageService.getIaModel();
     _modeloController.text =
-        modelo.isNotEmpty ? modelo : AppConfig.defaultIaModel;
+        modelo;
     _nombreController.text = widget.controller.nombreUsuario;
     SincronizacionService.onCambio = _actualizarTextoSync;
     setState(() {});
@@ -106,7 +105,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
   Future<void> _probarConexion() async {
     await widget.controller.hablar('Probando conexión con la IA…',
         guardarRespuesta: false);
-    final resultado = await IaNubeService.probarConexion();
+    final resultado = 'La IA externa ya no se usa en EYES.';
     await widget.controller.hablar(resultado, guardarRespuesta: false);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

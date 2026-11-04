@@ -16,7 +16,6 @@ import '../services/billetes_service.dart';
 import '../services/camera_service.dart';
 import '../services/color_service.dart';
 import '../services/command_parser.dart';
-import '../services/ia_nube_service.dart';
 import '../services/ocr_service.dart';
 import '../services/storage_service.dart';
 import '../services/texto_datos.dart';
@@ -121,7 +120,7 @@ class EyesController extends ChangeNotifier {
   bool get lecturaContinua => _lecturaContinua;
   bool get encuadreActivo => _encuadreActivo;
   List<ContactoApoyo> get contactos => List.unmodifiable(_contactos);
-  bool get iaNubeDisponible => _hayInternet && _usarIaNube && _aceptoIaNube;
+  bool get iaNubeDisponible => false;
 
   // -------------------- Inicialización --------------------
 
@@ -164,8 +163,8 @@ class EyesController extends ChangeNotifier {
   Future<void> _cargarPreferencias() async {
     _nombreUsuario = await StorageService.getNombre();
     _escuchaContinua = await StorageService.getEscuchaContinua();
-    _usarIaNube = await StorageService.getUsarIaNube();
-    _aceptoIaNube = await StorageService.getAceptoIaNube();
+    _usarIaNube = false;
+    _aceptoIaNube = false;
     _historial = await StorageService.getHistorial();
     _guardados = await StorageService.getGuardados();
     _vibracionActivada = await StorageService.getVibracion();
@@ -803,13 +802,13 @@ class EyesController extends ChangeNotifier {
 
   Future<void> _consultarIaConversacion(String pregunta) async {
     _setEstado(EstadoEyes.consultandoIA, 'Consultando a la IA');
-    final respuesta = await IaNubeService.conversar(pregunta);
+    final respuesta = null;
     final mensaje = respuesta.ok
         ? respuesta.texto
         : (respuesta.error ??
             'No pude consultar a la inteligencia artificial.');
     await _guardarEnHistorial(
-      Resultado.ahora(tipo: 'conversar', texto: mensaje, usoIaNube: true),
+      Resultado.ahora(tipo: 'conversar', texto: mensaje, usoIaNube: false),
     );
     await hablar(mensaje);
   }
@@ -859,8 +858,7 @@ class EyesController extends ChangeNotifier {
       );
 
       String mensaje;
-      var usoIa = false;
-
+      
       if (segura != null) {
         final porcentaje = (segura.confianza * 100).round();
         mensaje =
@@ -868,18 +866,17 @@ class EyesController extends ChangeNotifier {
       } else if (dudosa != null && iaNubeDisponible) {
         // Confianza media: solo la IA puede detallarlo sin adivinar.
         _setEstado(EstadoEyes.consultandoIA, 'Consultando a la IA');
-        final detalle = await IaNubeService.identificarDetallado(ruta);
+        final detalle = await null;
         mensaje = detalle.ok
             ? detalle.texto
             : (detalle.error ??
                 'No estoy seguro de qué es. Acércalo o mejora la luz.');
-        usoIa = detalle.ok;
       } else {
         mensaje = 'No estoy seguro de qué es. Acércalo o mejora la luz.';
       }
 
       await _guardarEnHistorial(
-        Resultado.ahora(tipo: 'identificar', texto: mensaje, usoIaNube: usoIa),
+        Resultado.ahora(tipo: 'identificar', texto: mensaje, usoIaNube: false),
       );
       Latencia.fin('identificar', sw);
       await hablar(mensaje);
@@ -941,11 +938,7 @@ class EyesController extends ChangeNotifier {
   }
 
   Future<void> describirEscena() async {
-    if (!iaNubeDisponible) {
-      await hablar('No hay conexión para describir la escena. Conecta internet o activa la IA en la nube.');
-      return;
-    }
-    if (_ocupado) return;
+        if (_ocupado) return;
     _ocupado = true;
     _setEstado(EstadoEyes.consultandoIA, 'Consultando a la IA');
     final sw = Latencia.iniciar('describir');
@@ -957,13 +950,13 @@ class EyesController extends ChangeNotifier {
         return;
       }
 
-      final descripcion = await IaNubeService.describirEscena(ruta);
+      final descripcion = await null;
       final mensaje = descripcion.ok
           ? descripcion.texto
           : (descripcion.error ??
               'No pude obtener la descripción. Revisa tu conexión.');
       await _guardarEnHistorial(
-        Resultado.ahora(tipo: 'describir', texto: mensaje, usoIaNube: true),
+        Resultado.ahora(tipo: 'describir', texto: mensaje, usoIaNube: false),
       );
       Latencia.fin('describir', sw);
       await hablar(mensaje);
@@ -988,11 +981,7 @@ class EyesController extends ChangeNotifier {
         return;
       }
     }
-    if (!iaNubeDisponible) {
-      await hablar('No puedo consultar a la IA sin conexión o sin permiso. Revisa los ajustes.');
-      return;
-    }
-    if (_ocupado) return;
+        if (_ocupado) return;
     _ocupado = true;
     _setEstado(EstadoEyes.consultandoIA, 'Consultando a la IA');
     final sw = Latencia.iniciar('pregunta imagen');
@@ -1004,13 +993,13 @@ class EyesController extends ChangeNotifier {
         return;
       }
 
-      final respuesta = await IaNubeService.preguntarSobreImagen(ruta, pregunta);
+      final respuesta = await null;
       final mensaje = respuesta.ok
           ? respuesta.texto
           : (respuesta.error ??
               'No pude obtener una respuesta. Revisa tu conexión.');
       await _guardarEnHistorial(
-        Resultado.ahora(tipo: 'pregunta', texto: mensaje, usoIaNube: true),
+        Resultado.ahora(tipo: 'pregunta', texto: mensaje, usoIaNube: false),
       );
       Latencia.fin('pregunta imagen', sw);
       await hablar(mensaje);
@@ -1021,11 +1010,7 @@ class EyesController extends ChangeNotifier {
   }
 
   Future<void> leerYResumir() async {
-    if (!iaNubeDisponible) {
-      await hablar('Necesito conexión a internet para resumir textos. Activa la IA en la nube.');
-      return;
-    }
-    if (_ocupado) return;
+        if (_ocupado) return;
     _ocupado = true;
     _setEstado(EstadoEyes.consultandoIA, 'Consultando a la IA');
     final sw = Latencia.iniciar('resumir');
@@ -1037,13 +1022,13 @@ class EyesController extends ChangeNotifier {
         return;
       }
 
-      final resumen = await IaNubeService.leerYResumir(ruta);
+      final resumen = await null;
       final mensaje = resumen.ok
           ? resumen.texto
           : (resumen.error ??
               'No pude leer ni resumir el texto. Revisa tu conexión.');
       await _guardarEnHistorial(
-        Resultado.ahora(tipo: 'resumen', texto: mensaje, usoIaNube: true),
+        Resultado.ahora(tipo: 'resumen', texto: mensaje, usoIaNube: false),
       );
       Latencia.fin('resumir', sw);
       await hablar(mensaje);
@@ -1083,8 +1068,7 @@ class EyesController extends ChangeNotifier {
 
       final billete = await BilletesService.identificar(ruta);
       String mensaje;
-      var usoIa = false;
-
+      
       if (billete.confiable) {
         mensaje = 'Es un billete de ${billete.denominacion} pesos.';
       } else if (billete.pista != null) {
@@ -1092,23 +1076,18 @@ class EyesController extends ChangeNotifier {
             '${billete.pista} pesos. Estira el billete y acércalo a la cámara.';
       } else if (iaNubeDisponible) {
         _setEstado(EstadoEyes.consultandoIA, 'Consultando a la IA');
-        final respuesta = await IaNubeService.preguntarSobreImagen(
-          ruta,
-          '¿Qué billete mexicano aparece y de qué denominación? '
-          'Responde en una frase corta, solo la denominación en pesos.',
-        );
+        final respuesta = await null;
         mensaje = respuesta.ok
             ? respuesta.texto
             : (respuesta.error ?? 'No pude reconocer el billete. '
                 'Estira el billete, acércalo a la cámara y busca buena luz.');
-        usoIa = respuesta.ok;
       } else {
         mensaje = 'No pude reconocer el billete. Estira el billete, '
             'acércalo a la cámara y busca buena luz.';
       }
 
       await _guardarEnHistorial(
-        Resultado.ahora(tipo: 'billete', texto: mensaje, usoIaNube: usoIa),
+        Resultado.ahora(tipo: 'billete', texto: mensaje, usoIaNube: false),
       );
       Latencia.fin('billete', sw);
       await hablar(mensaje);
@@ -1183,14 +1162,12 @@ class EyesController extends ChangeNotifier {
       }
 
       String mensaje;
-      var usoIa = false;
-      if (iaNubeDisponible) {
-        final descripcion = await IaNubeService.describirEscena(ruta);
+            if (iaNubeDisponible) {
+        final descripcion = await null;
         mensaje = descripcion.ok
             ? descripcion.texto
             : (descripcion.error ??
                 'No pude obtener la descripción. Revisa tu conexión.');
-        usoIa = descripcion.ok;
       } else {
         // Versión local: hasta 3 objetos, el color y el texto visible.
         final partes = <String>[];
@@ -1228,7 +1205,7 @@ class EyesController extends ChangeNotifier {
       }
 
       await _guardarEnHistorial(
-        Resultado.ahora(tipo: 'describir', texto: mensaje, usoIaNube: usoIa),
+        Resultado.ahora(tipo: 'describir', texto: mensaje, usoIaNube: false),
       );
       Latencia.fin('describe todo', sw);
       await hablar(mensaje);
