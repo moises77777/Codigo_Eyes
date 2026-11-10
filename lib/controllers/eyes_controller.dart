@@ -78,6 +78,7 @@ class EyesController extends ChangeNotifier {
   int _medicionesOscuras = 0;
   DateTime? _ultimaMedicionLuz;
   DateTime? _ultimoAvisoPocaLuz;
+  DateTime? _ultimoAvisoVacio;
   List<ContactoApoyo> _contactos = [];
   final Set<String> _lineasLeidas = {};
   int _reintentosEscucha = 0;
@@ -1420,6 +1421,25 @@ class EyesController extends ChangeNotifier {
         if (_framesVacios >= 12) {
           _ultimaEtiquetaContinua = '';
           _framesVacios = 0;
+        }
+        // Si lleva ~10 s sin ver nada, avisar una vez para que el
+        // usuario sepa que sigue activa (no silencio total). Se
+        // repite como mucho cada 12 s.
+        final ahoraVacio = DateTime.now();
+        if (_ultimoAvisoVacio == null ||
+            ahoraVacio.difference(_ultimoAvisoVacio!).inSeconds >= 12) {
+          _ultimoAvisoVacio = ahoraVacio;
+          if (_ultimoAnuncioTiempo == null ||
+              ahoraVacio.difference(_ultimoAnuncioTiempo!).inSeconds >= 10) {
+            _ultimoAnuncioTiempo = ahoraVacio;
+            // Apagar el mic ANTES de hablar para que Vosk no escuche
+            // la propia voz de la app y la confunda con un comando.
+            if (VoiceInputService.isListening) {
+              unawaited(VoiceInputService.stop());
+            }
+            unawaited(hablar('No veo nada claro. Acerca un objeto con buena luz.',
+                guardarRespuesta: false));
+          }
         }
         return;
       }

@@ -65,12 +65,13 @@ class CameraService {
 
       await _controller?.dispose();
       // Un solo CameraController sirve para preview, stream y fotos:
-      // cambiar de resolución reabriría la cámara (~1 s). Se usa 'high'
-      // (720p): con detección real por frame, veryHigh saturaba el CPU
-      // del Vivo y la vista se trababa.
+      // cambiar de resolución reabriría la cámara (~1 s). Se usa 'medium'
+      // (480p): en el Vivo, 'high' con inferencia en el hilo principal
+      // seguía trabando la vista; 480p baja el costo por frame ~2.3×
+      // y el objeto se sigue viendo igual de bien a distancia normal.
       _controller = CameraController(
         back,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
