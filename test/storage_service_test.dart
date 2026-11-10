@@ -53,11 +53,11 @@ void main() {
       expect(await StorageService.getPitch(), 1.2);
     });
 
-    test('guarda clave API y modelo', () async {
-      await StorageService.setIaApiKey('clave123');
-      await StorageService.setIaModel('modelo-test');
-      expect(await StorageService.getIaApiKey(), 'clave123');
-      expect(await StorageService.getIaModel(), 'modelo-test');
+    test('guarda URL del servidor y motor OCR', () async {
+      await StorageService.setApiUrl('http://192.168.1.10:8000');
+      await StorageService.setOcrMotor('servidor');
+      expect(await StorageService.getApiUrl(), 'http://192.168.1.10:8000');
+      expect(await StorageService.getOcrMotor(), 'servidor');
     });
 
     test('primer uso', () async {

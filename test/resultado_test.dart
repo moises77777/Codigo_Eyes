@@ -11,7 +11,6 @@ void main() {
         fecha: '15/10/2026',
         hora: '12:34',
         confianza: 0.85,
-        usoIaNube: true,
       );
 
       final json = original.toJson();
@@ -23,7 +22,6 @@ void main() {
       expect(copia.fecha, original.fecha);
       expect(copia.hora, original.hora);
       expect(copia.confianza, original.confianza);
-      expect(copia.usoIaNube, original.usoIaNube);
     });
 
     test('ahora genera fecha y hora válidas', () {
