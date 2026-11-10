@@ -25,6 +25,8 @@ class _AjustesScreenState extends State<AjustesScreen> {
   bool _escuchaContinua = true;
   bool _vibracion = true;
   bool _modeloPropio = false;
+  bool _modeloDecision = false;
+  bool _registrarDataset = false;
   double _umbral = 0.70;
   final _urlController = TextEditingController();
   final _claveNubeController = TextEditingController();
@@ -48,6 +50,8 @@ class _AjustesScreenState extends State<AjustesScreen> {
     _volume = TtsService.volume;
     _escuchaContinua = widget.controller.escuchaContinua;
     _vibracion = widget.controller.vibracionActivada;
+    _modeloDecision = widget.controller.usarModeloDecision;
+    _registrarDataset = widget.controller.registrarDataset;
     _modeloPropio = await StorageService.getModeloPropio();
     _umbral = await StorageService.getUmbralConfianza();
     _urlController.text = await StorageService.getApiUrl();
@@ -310,6 +314,47 @@ class _AjustesScreenState extends State<AjustesScreen> {
               onChanged: (v) async {
                 setState(() => _vibracion = v);
                 await widget.controller.setVibracion(v);
+              },
+            ),
+          ),
+          const Divider(),
+          Text(
+            'Modelo de decisión (práctica IA)',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          Semantics(
+            label: 'Usar el árbol de decisión propio para anunciar',
+            child: SwitchListTile(
+              title: const Text(
+                'Usar modelo de decisión',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              subtitle: const Text(
+                'El árbol entrenado decide qué se anuncia, en vez de la regla fija.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              value: _modeloDecision,
+              onChanged: (v) async {
+                setState(() => _modeloDecision = v);
+                await widget.controller.setModeloDecision(v);
+              },
+            ),
+          ),
+          Semantics(
+            label: 'Guardar detecciones en un archivo CSV',
+            child: SwitchListTile(
+              title: const Text(
+                'Registrar detecciones (CSV)',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              subtitle: const Text(
+                'Guarda cada anuncio para reentrenar el modelo con datos reales.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              value: _registrarDataset,
+              onChanged: (v) async {
+                setState(() => _registrarDataset = v);
+                await widget.controller.setRegistrarDataset(v);
               },
             ),
           ),

@@ -317,6 +317,32 @@ class StorageService {
     return _prefs?.getBool(_kModeloPropio) ?? false;
   }
 
+  // ---------- Modelo de decisión propio (práctica IA) ----------
+  // APAGADO por defecto: si está activo, la decisión "anunciar o
+  // esperar" la toma el árbol exportado (lib/ia/modelo_decision.dart).
+  static const _kModeloDecision = 'eyes_modelo_decision';
+  static Future<void> setModeloDecision(bool activo) async {
+    await init();
+    await _prefs?.setBool(_kModeloDecision, activo);
+  }
+
+  static Future<bool> getModeloDecision() async {
+    await init();
+    return _prefs?.getBool(_kModeloDecision) ?? false;
+  }
+
+  // ---------- Registro CSV de detecciones (reentrenar) ----------
+  static const _kRegistrarDataset = 'eyes_registrar_dataset';
+  static Future<void> setRegistrarDataset(bool activo) async {
+    await init();
+    await _prefs?.setBool(_kRegistrarDataset, activo);
+  }
+
+  static Future<bool> getRegistrarDataset() async {
+    await init();
+    return _prefs?.getBool(_kRegistrarDataset) ?? false;
+  }
+
   // ---------- Umbral de confianza para anunciar ----------
   static Future<void> setUmbralConfianza(double umbral) async {
     await init();

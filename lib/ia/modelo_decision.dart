@@ -11,6 +11,20 @@
 ///   este arbol  -> accuracy 0.975, F1 0.960
 ///   recall 'anunciar' del arbol: 0.947
 ///
+/// IMPORTANTE - honestidad del modelo:
+///   El dataset de entrenamiento es FICTICIO (400 detecciones
+///   generadas por p02_a_crear_dataset_eyes.py con random_state=42).
+///   La columna 'anunciar' se calculo con esta formula exacta:
+///     0 si brillo < 0.12 (imagen oscura);
+///     1 si confianza >= 0.85 y frames >= 2;
+///     1 si confianza >= umbral (0.55 peligroso / 0.68 normal) y
+///       frames >= 3 y (distancia_centro <= 0.75 o confianza >= 0.80);
+///     0 en cualquier otro caso.
+///   El arbol, por tanto, REDESCUBRE esa formula: sus metricas miden
+///   cuanto se acerca a ella, no el rendimiento real en la app.
+///   Para un modelo real hay que reentrenar con el CSV del registro
+///   del telefono (lib/ia/registro_detecciones.dart).
+///
 /// Para regenerarlo: python proyecto_eyes/exportar_arbol_a_dart.py
 /// (los casos de prueba estan en test/datos_modelo_decision.json).
 library;

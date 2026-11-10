@@ -23,6 +23,10 @@ import '../services/sincronizacion_service.dart';
 import '../services/tts_service.dart';
 import '../services/detector_service.dart';
 import '../services/voice_input_service.dart';
+import '../ia/caracteristicas.dart';
+import '../ia/modelo_decision.dart';
+import '../ia/registro_detecciones.dart';
+import '../utils/busqueda_bfs.dart';
 import '../utils/busquedas.dart';
 import '../utils/latencia.dart';
 import '../utils/prioridades.dart';
@@ -79,6 +83,21 @@ class EyesController extends ChangeNotifier {
   DateTime? _ultimaMedicionLuz;
   DateTime? _ultimoAvisoPocaLuz;
   DateTime? _ultimoAvisoVacio;
+
+  /// APAGADO por defecto: si es true, "anunciar o esperar" lo decide
+  /// el árbol exportado (lib/ia/modelo_decision.dart) en lugar de la
+  /// regla fija. Se persiste en StorageService y se alterna por voz
+  /// ("activa/desactiva modelo de decisión") o desde Ajustes.
+  bool usarModeloDecision = false;
+
+  /// Registro CSV opcional de detecciones (para reentrenar). Apagado
+  /// por defecto. Ver lib/ia/registro_detecciones.dart.
+  bool registrarDataset = false;
+
+  /// Brillo medio 0..1 del último frame medido. Lo actualiza
+  /// [_vigilarLuzAmbiente] cada ~3 s (suficiente para el modelo:
+  /// la luz ambiente no cambia de un frame a otro).
+  double _ultimoBrillo = 0.5;
   List<ContactoApoyo> _contactos = [];
   final Set<String> _lineasLeidas = {};
   int _reintentosEscucha = 0;
@@ -163,6 +182,9 @@ class EyesController extends ChangeNotifier {
     _guardados = await StorageService.getGuardados();
     _vibracionActivada = await StorageService.getVibracion();
     _contactos = await StorageService.getContactos();
+    usarModeloDecision = await StorageService.getModeloDecision();
+    registrarDataset = await StorageService.getRegistrarDataset();
+    RegistroDetecciones.configurar(registrarDataset);
     notifyListeners();
   }
 
@@ -255,6 +277,22 @@ class EyesController extends ChangeNotifier {
   Future<void> setVibracion(bool activa) async {
     _vibracionActivada = activa;
     await StorageService.setVibracion(activa);
+    unawaited(StorageService.setConfigPendiente(true));
+    notifyListeners();
+  }
+
+  /// Interruptor "Usar modelo de decisión (práctica IA)" de Ajustes.
+  Future<void> setModeloDecision(bool v) async {
+    usarModeloDecision = v;
+    await StorageService.setModeloDecision(v);
+    notifyListeners();
+  }
+
+  /// Interruptor "Registrar detecciones en CSV" de Ajustes.
+  Future<void> setRegistrarDataset(bool v) async {
+    registrarDataset = v;
+    RegistroDetecciones.configurar(v);
+    await StorageService.setRegistrarDataset(v);
     unawaited(StorageService.setConfigPendiente(true));
     notifyListeners();
   }
@@ -716,18 +754,38 @@ class EyesController extends ChangeNotifier {
         notifyListeners();
         break;
       case Comando.si:
+        // Con el registro activo, un 'sí/correcto' a tiempo marca la
+        // última detección anunciada como correcta (columna correcto=1).
+        final marco = await RegistroDetecciones.confirmar(true);
         if (_esperandoConfirmacionBorrar) {
           await confirmarBorrarHistorial();
+        } else if (marco) {
+          await hablar('Anotado como correcto.',
+              guardarRespuesta: false);
         } else {
           await _preguntaLibre(parsed.textoOriginal);
         }
         break;
       case Comando.no:
+        final marcoNo = await RegistroDetecciones.confirmar(false);
         if (_esperandoConfirmacionBorrar) {
           await cancelarBorrarHistorial();
+        } else if (marcoNo) {
+          await hablar('Anotado como incorrecto.',
+              guardarRespuesta: false);
         } else {
           await _preguntaLibre(parsed.textoOriginal);
         }
+        break;
+      case Comando.modeloDecisionOn:
+        await setModeloDecision(true);
+        await hablar('Modelo de decisión activado. Las detecciones '
+            'las decide el árbol entrenado.', guardarRespuesta: false);
+        break;
+      case Comando.modeloDecisionOff:
+        await setModeloDecision(false);
+        await hablar('Modelo de decisión desactivado. Volví a la '
+            'regla fija.', guardarRespuesta: false);
         break;
       case Comando.ninguno:
       case Comando.conversar:
@@ -1406,10 +1464,13 @@ class EyesController extends ChangeNotifier {
       );
 
       // Candidatos sobre el umbral con nombre real (nunca 'objeto' ni '???').
+      // Con el modelo activo el umbral baja al piso (0.25): la
+      // decisión "anunciar o esperar" la toma el árbol, no la regla.
+      final umbralVigente =
+          usarModeloDecision ? 0.25 : DetectorService.umbralConfianza;
       final validos = detecciones
           .where((d) =>
-              d.confianza >= DetectorService.umbralConfianza &&
-              d.etiqueta != 'objeto')
+              d.confianza >= umbralVigente && d.etiqueta != 'objeto')
           .toList();
       final mejor = _mejorDeteccion(validos);
 
@@ -1453,7 +1514,34 @@ class EyesController extends ChangeNotifier {
         _candidatoActual = mejor.etiqueta;
         _framesCandidato = 1;
       }
-      if (_framesCandidato < DetectorService.framesConfirmacion) return;
+      if (usarModeloDecision) {
+        // Seguro mínimo aunque el modelo mande: nunca anunciar un
+        // parpadeo de 1 solo frame.
+        if (_framesCandidato < 2) return;
+        final rotado = _cameraService.sensorOrientation == 90 ||
+            _cameraService.sensorOrientation == 270;
+        final c = CaracteristicasDeteccion.de(
+          mejor,
+          tamanoFrame: rotado
+              ? Size(frame.height.toDouble(), frame.width.toDouble())
+              : Size(frame.width.toDouble(), frame.height.toDouble()),
+          framesSeguidos: _framesCandidato,
+          brillo: _ultimoBrillo,
+        );
+        if (!ModeloDecision.debeAnunciar(
+          confianza: c.confianza,
+          areaRelativa: c.areaRelativa,
+          distanciaCentro: c.distanciaCentro,
+          framesSeguidos: c.framesSeguidos,
+          pesoPrioridad: c.pesoPrioridad,
+          esPeligroso: c.esPeligroso,
+          brillo: c.brillo,
+        )) {
+          return;
+        }
+      } else if (_framesCandidato < DetectorService.framesConfirmacion) {
+        return;
+      }
 
       // No repetir el mismo objeto dos veces seguidas.
       if (mejor.etiqueta.toLowerCase() ==
@@ -1483,6 +1571,24 @@ class EyesController extends ChangeNotifier {
         texto: texto,
         confianza: mejor.confianza,
       );
+
+      // Registro CSV opcional (apagado por defecto): queda pendiente
+      // la columna 'correcto' por si el usuario dice sí/no en 5 s.
+      if (registrarDataset) {
+        final rotado = _cameraService.sensorOrientation == 90 ||
+            _cameraService.sensorOrientation == 270;
+        unawaited(RegistroDetecciones.registrarAnuncio(
+          mejor.etiqueta,
+          CaracteristicasDeteccion.de(
+            mejor,
+            tamanoFrame: rotado
+                ? Size(frame.height.toDouble(), frame.width.toDouble())
+                : Size(frame.width.toDouble(), frame.height.toDouble()),
+            framesSeguidos: _framesCandidato,
+            brillo: _ultimoBrillo,
+          ),
+        ));
+      }
 
       // Detener el micrófono para que no reconozca la propia voz de EYES.
       if (VoiceInputService.isListening) {
@@ -1560,6 +1666,7 @@ class EyesController extends ChangeNotifier {
       cuenta++;
     }
     final media = cuenta == 0 ? 0 : suma ~/ cuenta;
+    _ultimoBrillo = media / 255.0;   // para el modelo de decisión
 
     if (media < 50) {
       _medicionesOscuras++;
@@ -2019,10 +2126,15 @@ class EyesController extends ChangeNotifier {
     _setEstado(EstadoEyes.hablando, 'Ejecutando algoritmos');
 
     try {
+      final bfs = BusquedaBfs.enArbolUcs('A', 'J');
       final ucs = Busquedas.costoUniforme('A', 'J');
       final ast = Busquedas.aEstrella('A', 'J');
 
       final resumen = 'Demostración de búsquedas. '
+        'Búsqueda en anchura usa una cola: exploré '
+        '${bfs.orden.join(', ')} y llegué por '
+        '${bfs.camino.join(' a ')} en ${bfs.costoTotal} pasos, el '
+        'camino más corto. '
         'Costo uniforme: exploré ${ucs.orden.join(', ')}. '
         'La mejor ruta es ${ucs.camino.join(' a ')} con costo ${ucs.costoTotal}. '
         'A estrella: exploré ${ast.orden.join(', ')}. '
