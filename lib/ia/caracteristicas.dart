@@ -5,7 +5,12 @@
 /// nombres deben coincidir con la lista VARIABLES de Python:
 ///
 ///   confianza, area_relativa, distancia_centro, frames_seguidos,
-///   peso_prioridad, es_peligroso, brillo
+///   es_peligroso, brillo
+///
+/// Nota: peso_prioridad se calculó pero NO entra al modelo — en los
+/// datos el árbol la usaba como corte parcial de peligro (escaleras
+/// 2.5, auto 2.2 y perro 1.6 quedaban fuera de su umbral 2.5), así
+/// que se quitó: todos los esPeligroso() se tratan igual.
 ///
 /// No modifica nada existente: la integración se hace en la FASE B.
 library;
@@ -22,7 +27,6 @@ class CaracteristicasDeteccion {
   final double areaRelativa;
   final double distanciaCentro;
   final double framesSeguidos;
-  final double pesoPrioridad;
   final double esPeligroso;
   final double brillo;
 
@@ -31,7 +35,6 @@ class CaracteristicasDeteccion {
     required this.areaRelativa,
     required this.distanciaCentro,
     required this.framesSeguidos,
-    required this.pesoPrioridad,
     required this.esPeligroso,
     required this.brillo,
   });
@@ -71,7 +74,6 @@ class CaracteristicasDeteccion {
       areaRelativa: areaRel.toDouble(),
       distanciaCentro: distancia.toDouble(),
       framesSeguidos: framesSeguidos.toDouble(),
-      pesoPrioridad: Prioridades.pesoDe(d.etiqueta),
       esPeligroso: Prioridades.esPeligroso(d.etiqueta) ? 1.0 : 0.0,
       brillo: brillo,
     );

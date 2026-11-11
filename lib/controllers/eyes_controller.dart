@@ -1533,7 +1533,6 @@ class EyesController extends ChangeNotifier {
           areaRelativa: c.areaRelativa,
           distanciaCentro: c.distanciaCentro,
           framesSeguidos: c.framesSeguidos,
-          pesoPrioridad: c.pesoPrioridad,
           esPeligroso: c.esPeligroso,
           brillo: c.brillo,
         )) {

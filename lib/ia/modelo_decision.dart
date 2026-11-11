@@ -8,8 +8,8 @@
 /// Muestras: 280 entrenamiento / 120 prueba
 /// Metricas en prueba:
 ///   regla fija  -> accuracy 0.925, F1 0.866
-///   este arbol  -> accuracy 0.975, F1 0.960
-///   recall 'anunciar' del arbol: 0.947
+///   este arbol  -> accuracy 0.983, F1 0.974
+///   recall 'anunciar' del arbol: 0.974
 ///
 /// IMPORTANTE - honestidad del modelo:
 ///   El dataset de entrenamiento es FICTICIO (400 detecciones
@@ -40,21 +40,12 @@ class ModeloDecision {
     required double areaRelativa,
     required double distanciaCentro,
     required double framesSeguidos,
-    required double pesoPrioridad,
     required double esPeligroso,
     required double brillo,
   }) {
         if (confianza <= 0.681500) {
-            if (pesoPrioridad <= 2.500000) {
-                if (confianza <= 0.669000) {
-                    return false;
-                } else {
-                    if (areaRelativa <= 0.450000) {
-                        return false;
-                    } else {
-                        return true;
-                    }
-                }
+            if (esPeligroso <= 0.500000) {
+                return false;
             } else {
                 if (confianza <= 0.542000) {
                     return false;

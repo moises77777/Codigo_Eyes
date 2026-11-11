@@ -51,13 +51,14 @@ class RegistroDetecciones {
 
   static Future<File> _asegurarArchivo() async {
     if (_archivo != null) return _archivo!;
+    // applicationId real: com.eyes.eyes_app (build.gradle.kts).
     final dir = Directory(_dirExterno);
     if (!dir.existsSync()) dir.createSync(recursive: true);
     _archivo = File('${dir.path}/$nombreArchivo');
     if (!_archivo!.existsSync()) {
       _archivo!.writeAsStringSync(
         'etiqueta,confianza,area_relativa,distancia_centro,'
-        'frames_seguidos,peso_prioridad,es_peligroso,brillo,'
+        'frames_seguidos,es_peligroso,brillo,'
         'anunciar,correcto,fecha\n');
     }
     return _archivo!;
@@ -72,7 +73,7 @@ class RegistroDetecciones {
     final f = await _asegurarArchivo();
     final fecha = DateTime.now().toIso8601String();
     _lineaPendiente = '$etiqueta,${c.confianza},${c.areaRelativa},'
-        '${c.distanciaCentro},${c.framesSeguidos},${c.pesoPrioridad},'
+        '${c.distanciaCentro},${c.framesSeguidos},'
         '${c.esPeligroso},${c.brillo},1,,$fecha';
     _ultimoAnuncio = DateTime.now();
     f.writeAsStringSync('$_lineaPendiente\n', flush: true, mode: FileMode.append);

@@ -174,4 +174,45 @@ void main() {
           Comando.ponerVibracion);
     });
   });
+
+  group('correcto vs incorrecto (feedback del registro)', () {
+    test('"correcto" -> Comando.si', () {
+      expect(CommandParser.interpretar('correcto').comando, Comando.si);
+    });
+    test('"incorrecto" -> Comando.no, no Comando.si', () {
+      expect(CommandParser.interpretar('incorrecto').comando, Comando.no);
+    });
+    test('"es incorrecto" -> Comando.no (no confunde con correcto)', () {
+      expect(CommandParser.interpretar('es incorrecto').comando,
+          Comando.no);
+    });
+    test('"sí" -> Comando.si y "no" -> Comando.no', () {
+      expect(CommandParser.interpretar('sí').comando, Comando.si);
+      expect(CommandParser.interpretar('no').comando, Comando.no);
+    });
+  });
+
+  group('modelo de decisión (práctica IA)', () {
+    test('"activa modelo de decisión" -> modeloDecisionOn', () {
+      expect(
+          CommandParser.interpretar('activa modelo de decisión').comando,
+          Comando.modeloDecisionOn);
+    });
+    test('"desactiva modelo de decisión" -> modeloDecisionOff', () {
+      expect(
+          CommandParser.interpretar('desactiva modelo de decisión')
+              .comando,
+          Comando.modeloDecisionOff);
+    });
+    test('"detección continua" -> deteccionContinua (no el modelo)', () {
+      expect(CommandParser.interpretar('detección continua').comando,
+          Comando.deteccionContinua);
+    });
+    test('"activa modelo propio" prende el modelo, no lo apaga', () {
+      expect(CommandParser.interpretar('activa modelo propio').comando,
+          Comando.modeloDecisionOn);
+      expect(CommandParser.interpretar('desactiva modelo propio').comando,
+          Comando.modeloDecisionOff);
+    });
+  });
 }

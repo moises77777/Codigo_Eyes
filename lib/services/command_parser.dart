@@ -377,6 +377,18 @@ class CommandParser {
       'usa regla fija',
       'desactiva modelo propio',
     ],
+    // OJO: 'no' va ANTES de 'si' — 'incorrecto' contiene la subcadena
+    // 'correcto'; si los puntajes empatan debe ganar la negacion.
+    Comando.no: [
+      'no',
+      'nel',
+      'negativo',
+      'incorrecto',
+      'no gracias',
+      'cancela',
+      'no lo hagas',
+      'para nada',
+    ],
     Comando.si: [
       'si',
       'correcto',
@@ -390,16 +402,6 @@ class CommandParser {
       'afirmativo',
       'asi es',
       'exacto',
-    ],
-    Comando.no: [
-      'no',
-      'nel',
-      'negativo',
-      'incorrecto',
-      'no gracias',
-      'cancela',
-      'no lo hagas',
-      'para nada',
     ],
   };
 
@@ -458,6 +460,31 @@ class CommandParser {
         }
       }
     }
+
+    // Feedback del registro: 'correcto'/'incorrecto' como palabra
+    // COMPLETA, antes de las preguntas ('es incorrecto' empezaria
+    // con 'es' y caeria como pregunta sobre la imagen). Se comparan
+    // palabras enteras: 'incorrecto' nunca contiene 'correcto' como
+    // palabra, asi que la negacion no puede confundirse.
+    final palabras = normalizado.split(RegExp(r'\s+')).toSet();
+    if (palabras.intersection(
+            {'incorrecto', 'incorrecta', 'inexacto', 'inexacta'})
+        .isNotEmpty) {
+      return ComandoVoz(
+        comando: Comando.no,
+        textoOriginal: original,
+        confianza: 0.9,
+      );
+    }
+    if (palabras.contains('correcto') ||
+        palabras.contains('correcta')) {
+      return ComandoVoz(
+        comando: Comando.si,
+        textoOriginal: original,
+        confianza: 0.9,
+      );
+    }
+
 
     // Preguntas directas sobre la imagen.
     if (_esPreguntaSobreImagen(normalizado)) {

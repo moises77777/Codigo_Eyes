@@ -26,7 +26,6 @@ void main() {
         areaRelativa: (c['area_relativa'] as num).toDouble(),
         distanciaCentro: (c['distancia_centro'] as num).toDouble(),
         framesSeguidos: (c['frames_seguidos'] as num).toDouble(),
-        pesoPrioridad: (c['peso_prioridad'] as num).toDouble(),
         esPeligroso: (c['es_peligroso'] as num).toDouble(),
         brillo: (c['brillo'] as num).toDouble(),
       );
